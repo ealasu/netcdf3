@@ -1,34 +1,30 @@
-mod parse_error;
-pub use parse_error::{ParseHeaderError, ParseErrorKind, InvalidBytes};
-pub(crate) use parse_error::NomError;
+pub mod input_error;
+use input_error::{ParseHeaderError, ReadDataError};
 
 use crate::DataType;
 
 /// NetCDF-3 data errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InvalidDataSet {
-    DimensionNameAlreadyExists(String),
+    DimensionAlreadyExists(String),
     DimensionNotDefined(String),
-    DimensionsNotDefined(Vec<String>),
-    DimensionsUsedMultipleTimes(Vec<String>),
-    UnlimitedDimensionNotDefined,
+    DimensionsNotDefined{var_name: String, get_undef_dim_names: Vec<String>},
+    DimensionsUsedMultipleTimes{var_name: String, get_dim_names: Vec<String>},
     UnlimitedDimensionAlreadyExists(String),
-    DimensionYetUsed(Vec<String>, String),
+    DimensionYetUsed{var_names: Vec<String>, dim_name: String},
     DimensionsIdsNotValid(Vec<usize>),
     DimensionNameNotValid(String),
 
-    VariableAttributeAlreadyExists(String, String),
-    VariableAttributeNotDefined(String, String),
-    VariableAttributeNameNotValid(String, String),
+    VariableAttributeAlreadyExists{var_name: String, attr_name: String},
+    VariableAttributeNotDefined{var_name: String, attr_name: String},
+    VariableAttributeNameNotValid{var_name: String, attr_name: String},
 
     VariableNotDefined(String),
     VariableNameNotValid(String),
     VariableAlreadyExists(String),
-    VariableMismatchDataType((String, DataType), DataType),
-    VariableMismatchDataLength((String, usize), usize),
-    VariableRequiresAtLeastOneDimension(String),
-    VariableDataNotFound(String, DataType, usize),
-    UnlimitedDimensionMustBeDefinedFirst(String),
+    VariableMismatchDataType{var_name: String, req: DataType, get: DataType},
+    VariableMismatchDataLength{var_name: String, req: usize, get: usize},
+    UnlimitedDimensionMustBeDefinedFirst{var_name: String, unlim_dim_name: String, get_dim_names: Vec<String>},
 
     GlobalAttributeAlreadyExists(String),
     GlobalAttributeNotDefined(String),
@@ -43,11 +39,6 @@ impl std::fmt::Display for InvalidDataSet {
 
 impl std::error::Error for InvalidDataSet {}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ReadDataError {
-    Unexpected,
-    Read(std::io::ErrorKind),
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IOError {

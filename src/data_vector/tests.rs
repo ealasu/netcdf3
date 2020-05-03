@@ -1,9 +1,20 @@
 #![cfg(test)]
 
 use super::DataVector;
+use crate::DataType;
 
 #[test]
-fn test_typed_data_container_equality() {
+fn test_get_data_type() {
+    assert_eq!(DataType::I8, DataVector::I8(vec![]).data_type());
+    assert_eq!(DataType::U8, DataVector::U8(vec![]).data_type());
+    assert_eq!(DataType::I16, DataVector::I16(vec![]).data_type());
+    assert_eq!(DataType::I32, DataVector::I32(vec![]).data_type());
+    assert_eq!(DataType::F32, DataVector::F32(vec![]).data_type());
+    assert_eq!(DataType::F64, DataVector::F64(vec![]).data_type());
+}
+
+#[test]
+fn test_equality_operation() {
     // Test equality between empty containers
     {
         let a = DataVector::I8(vec![]);

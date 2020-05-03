@@ -1,11 +1,9 @@
-#[cfg(test)]
-mod common;
-
+#![cfg(test)]
 use std::rc::Rc;
 
 use netcdf3::{FileReader, DataSet, Variable, Attribute, Dimension, DataType, Version};
 
-use common::{
+use copy_to_tmp_file::{
     copy_bytes_to_tmp_file,
     EMPTY_DATA_SET_FILE_NAME ,EMPTY_DATA_SET_FILE_BYTES,
     NC3_CLASSIC_FILE_NAME, NC3_CLASSIC_FILE_BYTES,
@@ -15,12 +13,12 @@ use common::{
 };
 
 #[test]
-fn test_file_empty_data_set() {
+fn test_read_file_empty_data_set() {
     // Copy bytes to a temporary file
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(EMPTY_DATA_SET_FILE_BYTES, EMPTY_DATA_SET_FILE_NAME);
 
     // Read the data set
-    let data_set: DataSet = {
+    let (data_set, version): (DataSet, Version) = {
         let mut file_reader = FileReader::open(input_data_file_path).unwrap();
         let _ = file_reader.read_all_vars().unwrap();
         file_reader.close()
@@ -28,7 +26,7 @@ fn test_file_empty_data_set() {
     tmp_dir.close().unwrap();
 
     // Check the parsed header
-    assert_eq!(Version::Classic, data_set.version());
+    assert_eq!(Version::Classic, version);
     assert_eq!(0, data_set.num_dims());
     assert_eq!(0, data_set.num_global_attrs());
     assert_eq!(0, data_set.num_vars());
@@ -40,7 +38,7 @@ fn test_read_file_nc3_classic() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
     // Read the data set
-    let data_set: DataSet = {
+    let (data_set, version): (DataSet, Version) = {
         let mut file_reader = FileReader::open(input_data_file_path).unwrap();
         let _ = file_reader.read_all_vars().unwrap();
         file_reader.close()
@@ -49,7 +47,7 @@ fn test_read_file_nc3_classic() {
 
 
     // Check the parsed header
-    assert_eq!(Version::Classic, data_set.version());
+    assert_eq!(Version::Classic, version);
     {
         assert_eq!(1, data_set.num_global_attrs());
         assert!(data_set.get_global_attr_i8("comment").is_none());
@@ -62,7 +60,7 @@ fn test_read_file_nc3_classic() {
         assert!(data_set.get_global_attr("comment").is_some());
         let attr: &Attribute = data_set.get_global_attr("comment").unwrap();
         assert!(attr.get_u8().is_some());
-        let attr_data: &Vec<u8> = attr.get_u8().unwrap();
+        let attr_data: &[u8] = attr.get_u8().unwrap();
         assert_eq!(
             "NETCDF3_CLASSIC file".as_bytes(),
             &attr_data[..],
@@ -81,7 +79,7 @@ fn test_read_file_nc3_64bit_offset() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_64BIT_OFFSET_FILE_BYTES, NC3_64BIT_OFFSET_FILE_NAME);
 
     // Read the data set
-    let data_set: DataSet = {
+    let (data_set, version): (DataSet, Version) = {
         let mut file_reader = FileReader::open(input_data_file_path).unwrap();
         let _ = file_reader.read_all_vars().unwrap();
         file_reader.close()
@@ -89,7 +87,7 @@ fn test_read_file_nc3_64bit_offset() {
     tmp_dir.close().unwrap();
 
     // Check the parsed header
-    assert_eq!(Version::Offset64Bit, data_set.version());
+    assert_eq!(Version::Offset64Bit, version);
     {
         assert_eq!(1, data_set.num_global_attrs());
         assert!(data_set.get_global_attr_i8("comment").is_none());
@@ -102,7 +100,7 @@ fn test_read_file_nc3_64bit_offset() {
         assert!(data_set.get_global_attr("comment").is_some());
         let attr: &Attribute = data_set.get_global_attr("comment").unwrap();
         assert!(attr.get_u8().is_some());
-        let attr_data: &Vec<u8> = attr.get_u8().unwrap();
+        let attr_data: &[u8] = attr.get_u8().unwrap();
         assert_eq!(
             "NETCDF3_64BIT_OFFSET file".as_bytes(),
             &attr_data[..],
@@ -227,7 +225,7 @@ fn check_temperature_dataset_header(data_set: &DataSet)
             let attr: &Attribute = temp_var.get_attr("standard_name").unwrap();
             assert_eq!(DataType::U8, attr.data_type());
             assert!(attr.get_u8().is_some());
-            let attr_data: &Vec<u8> = attr.get_u8().unwrap();
+            let attr_data: &[u8] = attr.get_u8().unwrap();
             assert_eq!(
                 "air_temperature".as_bytes(),
                 &attr_data[..],
@@ -238,7 +236,7 @@ fn check_temperature_dataset_header(data_set: &DataSet)
             let attr: &Attribute = temp_var.get_attr("long_name").unwrap();
             assert_eq!(DataType::U8, attr.data_type());
             assert!(attr.get_u8().is_some());
-            let attr_data: &Vec<u8> = attr.get_u8().unwrap();
+            let attr_data: &[u8] = attr.get_u8().unwrap();
             assert_eq!(
                 "TEMPERATURE".as_bytes(),
                 &attr_data[..],
@@ -249,7 +247,7 @@ fn check_temperature_dataset_header(data_set: &DataSet)
             let attr: &Attribute = temp_var.get_attr("units").unwrap();
             assert_eq!(DataType::U8, attr.data_type());
             assert!(attr.get_u8().is_some());
-            let attr_data: &Vec<u8> = attr.get_u8().unwrap();
+            let attr_data: &[u8]= attr.get_u8().unwrap();
             assert_eq!(
                 "Celsius".as_bytes(),
                 &attr_data[..],
@@ -316,7 +314,7 @@ fn check_temperature_dataset_header(data_set: &DataSet)
         assert_eq!(15, temp_var.num_elements_per_chunk());
         assert_eq!(60, temp_var.chunk_size());
     }
-    assert_eq!(4 + 16 + 16 + 32 + 60 + 60 + 120, data_set.record_size());
+    assert_eq!(4 + 16 + 16 + 32 + 60 + 60 + 120, data_set.num_bytes_per_record());
 
     // the variable `temperature_f64`
     {
@@ -333,7 +331,7 @@ fn check_temperature_dataset_header(data_set: &DataSet)
         assert_eq!(120, temp_var.chunk_size());
     }
 
-    let expected_record_size: usize = data_set.get_vars().into_iter()
+    let expected_num_bytes_per_record: usize = data_set.get_vars().into_iter()
         .map(|var|{
             var
         })
@@ -344,7 +342,7 @@ fn check_temperature_dataset_header(data_set: &DataSet)
             sum + var.chunk_size()
         });
 
-    assert_eq!(expected_record_size, data_set.record_size());
+    assert_eq!(expected_num_bytes_per_record, data_set.num_bytes_per_record());
 }
 
 fn check_temperature_dataset_values(data_set: &DataSet){
@@ -353,9 +351,9 @@ fn check_temperature_dataset_values(data_set: &DataSet){
         assert!(data_set.get_var("latitude").is_some());
         let latitude_var: &Variable = data_set.get_var("latitude").unwrap();
         assert!(latitude_var.get_f32().is_some());
-        let latitude_data: &Vec<f32> = latitude_var.get_f32().unwrap();
+        let latitude_data: &[f32] = latitude_var.get_f32().unwrap();
         assert_eq!(
-            &vec![0.0, 0.5, 1.0],
+            [0.0, 0.5, 1.0],
             latitude_data,
         )
     }
@@ -364,9 +362,9 @@ fn check_temperature_dataset_values(data_set: &DataSet){
         assert!(data_set.get_var("longitude").is_some());
         let longitude_var: &Variable = data_set.get_var("longitude").unwrap();
         assert!(longitude_var.get_f32().is_some());
-        let longitude_data: &Vec<f32> = longitude_var.get_f32().unwrap();
+        let longitude_data: &[f32] = longitude_var.get_f32().unwrap();
         assert_eq!(
-            &vec![0.0, 0.5, 1.0, 1.5, 2.0],
+            [0.0, 0.5, 1.0, 1.5, 2.0],
             longitude_data,
         );
     }
@@ -375,9 +373,9 @@ fn check_temperature_dataset_values(data_set: &DataSet){
         assert!(data_set.get_var("time").is_some());
         let time_var: &Variable = data_set.get_var("time").unwrap();
         assert!(time_var.get_f32().is_some());
-        let time_data: &Vec<f32> = time_var.get_f32().unwrap();
+        let time_data: &[f32] = time_var.get_f32().unwrap();
         assert_eq!(
-            &vec![438_300.0, 438_324.0],
+            [438_300.0, 438_324.0],
             time_data,
         );
     }
@@ -394,9 +392,9 @@ fn check_temperature_dataset_values(data_set: &DataSet){
         assert!(temp_var.get_f64().is_none());
 
         let expected_temp_data: Vec<i8> = (0_i8..30).collect();
-        let temp_data: &Vec<i8> = temp_var.get_i8().unwrap();
+        let temp_data: &[i8]= temp_var.get_i8().unwrap();
         assert_eq!(
-            &expected_temp_data,
+            expected_temp_data,
             temp_data,
         );
     }
@@ -413,9 +411,9 @@ fn check_temperature_dataset_values(data_set: &DataSet){
         assert!(temp_var.get_f64().is_none());
 
         let expected_temp_data: Vec<u8> = (0_u8..30).collect();
-        let temp_data: &Vec<u8> = temp_var.get_u8().unwrap();
+        let temp_data: &[u8] = temp_var.get_u8().unwrap();
         assert_eq!(
-            &expected_temp_data,
+            expected_temp_data,
             temp_data,
         );
     }
@@ -432,9 +430,9 @@ fn check_temperature_dataset_values(data_set: &DataSet){
         assert!(temp_var.get_f64().is_none());
 
         let expected_temp_data: Vec<i16> = (0_i16..30).collect();
-        let temp_data: &Vec<i16> = temp_var.get_i16().unwrap();
+        let temp_data: &[i16] = temp_var.get_i16().unwrap();
         assert_eq!(
-            &expected_temp_data,
+            expected_temp_data,
             temp_data,
         );
     }
@@ -451,9 +449,9 @@ fn check_temperature_dataset_values(data_set: &DataSet){
         assert!(temp_var.get_f64().is_none());
 
         let expected_temp_data: Vec<i32> = (0_i32..30).collect();
-        let temp_data: &Vec<i32> = temp_var.get_i32().unwrap();
+        let temp_data: &[i32] = temp_var.get_i32().unwrap();
         assert_eq!(
-            &expected_temp_data,
+            expected_temp_data,
             temp_data,
         );
     }
@@ -470,9 +468,9 @@ fn check_temperature_dataset_values(data_set: &DataSet){
         assert!(temp_var.get_f64().is_none());
 
         let expected_temp_data: Vec<f32> = (0_i32..30).map(|i: i32| i as f32).collect();
-        let temp_data: &Vec<f32> = temp_var.get_f32().unwrap();
+        let temp_data: &[f32] = temp_var.get_f32().unwrap();
         assert_eq!(
-            &expected_temp_data,
+            expected_temp_data,
             temp_data,
         );
     }
@@ -489,9 +487,9 @@ fn check_temperature_dataset_values(data_set: &DataSet){
         assert!(temp_var.get_f64().is_some());
 
         let expected_temp_data: Vec<f64> = (0_i32..30).map(|i: i32| i as f64).collect();
-        let temp_data: &Vec<f64> = temp_var.get_f64().unwrap();
+        let temp_data: &[f64] = temp_var.get_f64().unwrap();
         assert_eq!(
-            &expected_temp_data,
+            expected_temp_data,
             temp_data,
         );
     }
@@ -507,7 +505,7 @@ fn test_read_file_empty_variables() {
     let data_set: DataSet = {
         let mut file_reader = FileReader::open(input_data_file_path).unwrap();
         let _ = file_reader.read_all_vars().unwrap();
-        file_reader.close()
+        file_reader.close().0
     };
     tmp_dir.close().unwrap();
 
@@ -530,7 +528,7 @@ fn test_read_file_empty_variables() {
         assert!(var.get_f32().is_none());
         assert!(var.get_f64().is_none());
 
-        let data: &Vec<i8> = var.get_i8().unwrap();
+        let data: &[i8] = var.get_i8().unwrap();
         assert!(data.is_empty());
     }
     // Check the variable `no_value_u8`
@@ -543,7 +541,7 @@ fn test_read_file_empty_variables() {
         assert!(var.get_f32().is_none());
         assert!(var.get_f64().is_none());
 
-        let data: &Vec<u8> = var.get_u8().unwrap();
+        let data: &[u8] = var.get_u8().unwrap();
         assert!(data.is_empty());
     }
     // Check the variable `no_value_i16`
@@ -556,7 +554,7 @@ fn test_read_file_empty_variables() {
         assert!(var.get_f32().is_none());
         assert!(var.get_f64().is_none());
 
-        let data: &Vec<i16> = var.get_i16().unwrap();
+        let data: &[i16] = var.get_i16().unwrap();
         assert!(data.is_empty());
     }
     // Check the variable `no_value_i32`
@@ -569,7 +567,7 @@ fn test_read_file_empty_variables() {
         assert!(var.get_f32().is_none());
         assert!(var.get_f64().is_none());
 
-        let data: &Vec<i32> = var.get_i32().unwrap();
+        let data: &[i32] = var.get_i32().unwrap();
         assert!(data.is_empty());
     }
     // Check the variable `no_value_f32`
@@ -582,7 +580,7 @@ fn test_read_file_empty_variables() {
         assert!(var.get_f32().is_some());
         assert!(var.get_f64().is_none());
 
-        let data: &Vec<f32> = var.get_f32().unwrap();
+        let data: &[f32] = var.get_f32().unwrap();
         assert!(data.is_empty());
     }
     // Check the variable `no_value_f64`
@@ -595,7 +593,7 @@ fn test_read_file_empty_variables() {
         assert!(var.get_f32().is_none());
         assert!(var.get_f64().is_some());
 
-        let data: &Vec<f64> = var.get_f64().unwrap();
+        let data: &[f64] = var.get_f64().unwrap();
         assert!(data.is_empty());
     }
 }
@@ -610,7 +608,7 @@ fn test_read_file_scalar_variables() {
     let data_set: DataSet = {
         let mut file_reader = FileReader::open(input_data_file_path).unwrap();
         let _ = file_reader.read_all_vars().unwrap();
-        file_reader.close()
+        file_reader.close().0
     };
     tmp_dir.close().unwrap();
 
@@ -633,9 +631,9 @@ fn test_read_file_scalar_variables() {
         assert!(var.get_f32().is_none());
         assert!(var.get_f64().is_none());
 
-       let data: &Vec<i8> = var.get_i8().unwrap();
+       let data: &[i8]= var.get_i8().unwrap();
        assert_eq!(1, data.len());
-       assert_eq!(&vec![42_i8], data);
+       assert_eq!(vec![42_i8], data);
     }
     // Check the variable `scalar_value_u8`
     {
@@ -647,9 +645,9 @@ fn test_read_file_scalar_variables() {
         assert!(var.get_f32().is_none());
         assert!(var.get_f64().is_none());
 
-        let data: &Vec<u8> = var.get_u8().unwrap();
+        let data: &[u8] = var.get_u8().unwrap();
         assert_eq!(1, data.len());
-        assert_eq!(&vec![42_u8], data);
+        assert_eq!(vec![42_u8], data);
     }
     // Check the variable `scalar_value_i16`
     {
@@ -661,9 +659,9 @@ fn test_read_file_scalar_variables() {
         assert!(var.get_f32().is_none());
         assert!(var.get_f64().is_none());
 
-        let data: &Vec<i16> = var.get_i16().unwrap();
+        let data: &[i16] = var.get_i16().unwrap();
         assert_eq!(1, data.len());
-        assert_eq!(&vec![42_i16], data);
+        assert_eq!(vec![42_i16], data);
     }
     // Check the variable `scalar_value_i32`
     {
@@ -675,9 +673,9 @@ fn test_read_file_scalar_variables() {
         assert!(var.get_f32().is_none());
         assert!(var.get_f64().is_none());
 
-        let data: &Vec<i32> = var.get_i32().unwrap();
+        let data: &[i32] = var.get_i32().unwrap();
         assert_eq!(1, data.len());
-        assert_eq!(&vec![42_i32], data);
+        assert_eq!(vec![42_i32], data);
     }
     // Check the variable `scalar_value_f32`
     {
@@ -689,9 +687,9 @@ fn test_read_file_scalar_variables() {
         assert!(var.get_f32().is_some());
         assert!(var.get_f64().is_none());
 
-        let data: &Vec<f32> = var.get_f32().unwrap();
+        let data: &[f32] = var.get_f32().unwrap();
         assert_eq!(1, data.len());
-        assert_eq!(&vec![42.0_f32], data);
+        assert_eq!(vec![42.0_f32], data);
     }
     // Check the variable `scalar_value_f64`
     {
@@ -703,8 +701,8 @@ fn test_read_file_scalar_variables() {
         assert!(var.get_f32().is_none());
         assert!(var.get_f64().is_some());
 
-        let data: &Vec<f64> = var.get_f64().unwrap();
+        let data: &[f64] = var.get_f64().unwrap();
         assert_eq!(1, data.len());
-        assert_eq!(&vec![42.0_f64], data);
+        assert_eq!(vec![42.0_f64], data);
     }
 }

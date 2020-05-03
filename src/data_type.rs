@@ -12,7 +12,27 @@ const F32_TYPE_C_API_NAME: &'static str = "NC_FLOAT";
 const F64_TYPE_C_API_NAME: &'static str = "NC_DOUBLE";
 
 
-/// All types supported by the NetCDF-3 format.
+/// All data types supported by the NetCDF-3 format
+///
+/// # Example
+///
+/// ```
+/// use netcdf3::{DataType};
+///
+/// assert_eq!("NC_BYTE",   DataType::I8.c_api_name());
+/// assert_eq!("NC_CHAR",   DataType::U8.c_api_name());
+/// assert_eq!("NC_SHORT",  DataType::I16.c_api_name());
+/// assert_eq!("NC_INT",    DataType::I32.c_api_name());
+/// assert_eq!("NC_FLOAT",  DataType::F32.c_api_name());
+/// assert_eq!("NC_DOUBLE", DataType::F64.c_api_name());
+/// 
+/// assert_eq!(1, DataType::I8.size_of());
+/// assert_eq!(1, DataType::U8.size_of());
+/// assert_eq!(2, DataType::I16.size_of());
+/// assert_eq!(4, DataType::I32.size_of());
+/// assert_eq!(4, DataType::F32.size_of());
+/// assert_eq!(8, DataType::F64.size_of());
+/// ```
 #[repr(u32)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DataType {
@@ -54,7 +74,7 @@ impl std::convert::TryFrom<u32> for DataType {
             4_u32 => Ok(DataType::I32),
             5_u32 => Ok(DataType::F32),
             6_u32 => Ok(DataType::F64),
-            _ => Err("Invalid data type number."),
+            _ => Err("Invalid value for a NetCDF-3 data type."),
         }
     }
 }
@@ -62,8 +82,10 @@ impl std::convert::TryFrom<u32> for DataType {
 impl DataType {
 
     /// Returns the size (in bytes) of one element of `DataType`.
-    /// ```
-    /// 
+    ///
+    /// # Example
+    ///
+    /// ``` 
     /// # use netcdf3::DataType;
     /// assert_eq!(1, DataType::I8.size_of());
     /// assert_eq!(1, DataType::U8.size_of());
@@ -86,7 +108,7 @@ impl DataType {
 
     /// Returns the name of the `DataType` commoly used in the NedCDF C API.
     ///
-    /// # Examples
+    /// # Example
     /// 
     /// ```
     /// # use netcdf3::DataType;
@@ -150,15 +172,16 @@ mod tests {
 
     #[test]
     fn test_data_type_try_from_u32() -> Result<(), &'static str> {
-        assert_eq!(DataType::I8, DataType::try_from(1_u32)?);
-        assert_eq!(DataType::U8, DataType::try_from(2_u32)?);
-        assert_eq!(DataType::I16, DataType::try_from(3_u32)?);
-        assert_eq!(DataType::I32, DataType::try_from(4_u32)?);
-        assert_eq!(DataType::F32, DataType::try_from(5_u32)?);
-        assert_eq!(DataType::F64, DataType::try_from(6_u32)?);
 
-        assert!(DataType::try_from(0_u32).is_err());
-        assert!(DataType::try_from(7_u32).is_err());
+        assert_eq!(Err("Invalid value for a NetCDF-3 data type."), DataType::try_from(0_u32));
+        assert_eq!(Ok(DataType::I8),                            DataType::try_from(1_u32));
+        assert_eq!(Ok(DataType::U8),                            DataType::try_from(2_u32));
+        assert_eq!(Ok(DataType::I16),                           DataType::try_from(3_u32));
+        assert_eq!(Ok(DataType::I32),                           DataType::try_from(4_u32));
+        assert_eq!(Ok(DataType::F32),                           DataType::try_from(5_u32));
+        assert_eq!(Ok(DataType::F64),                           DataType::try_from(6_u32));
+        assert_eq!(Err("Invalid value for a NetCDF-3 data type."), DataType::try_from(7_u32));
+
         Ok(())
     }
 }

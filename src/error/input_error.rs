@@ -1,3 +1,5 @@
+
+
 // aliases
 pub(crate) type NomErrorKind = nom::error::ErrorKind;
 pub(crate) type NomError<'a> = nom::Err<(&'a[u8], NomErrorKind)>;
@@ -59,4 +61,9 @@ pub enum ParseErrorKind {
     Offset,
 }
 
-
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReadDataError {
+    Unexpected,
+    VariablesNotDefined(Vec<String>),
+    Read(std::io::ErrorKind),
+}

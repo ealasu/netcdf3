@@ -1,29 +1,254 @@
 use crate::name_string::is_valid_name;
-use crate::typed_data_vector::DataVector;
+use crate::data_vector::DataVector;
 use crate::DataType;
 
-/// Represents a NetCDF-3 attribute.
+/// NetCDF-3 attribute
 ///
-/// # Example
+/// `Attribute` instances are managed by a [`DataSet`](struct.DataSet.html).
+///
+/// `DataSet`s allow to create, read, remove and rename `Attributes`s.
+///
+/// # Examples
+///
+/// ## Global attributes
+///
+/// ### Create and read a global attribute
 ///
 /// ```
-/// # use netcdf3::{DataType, Attribute, DataSet, Version};
+/// use netcdf3::{DataSet, Attribute, DataType};
 ///
-/// let mut data_set = DataSet::new(Version::Classic);
-/// let _ = data_set.add_global_attr_i8("attr_1", vec![0, 1, 2, 3]).unwrap();
+/// const GLOBAL_ATTR_NAME: &str = "attr_1";
+/// const GLOBAL_ATTR_DATA: [i32; 3] = [1, 2, 3];
+/// const GLOBAL_ATTR_LEN: usize = GLOBAL_ATTR_DATA.len();
 ///
-/// let attr: &Attribute = data_set.get_global_attr("attr_1").unwrap();
+/// // First create the data set
+/// let mut data_set = DataSet::new();
 ///
-/// assert_eq!(DataType::I8, attr.data_type());
-/// assert!(attr.get_i8().is_some());
-/// assert_eq!(&vec![0_i8, 1, 2, 3], attr.get_i8().unwrap());
+/// // Create a `i32` global attribute
+/// data_set.add_global_attr_i32(GLOBAL_ATTR_NAME, GLOBAL_ATTR_DATA.to_vec()).unwrap();
 ///
-/// assert_eq!(None, attr.get_u8());
-/// assert_eq!(None, attr.get_i16());
-/// assert_eq!(None, attr.get_i32());
-/// assert_eq!(None, attr.get_f32());
-/// assert_eq!(None, attr.get_f64());
+/// assert_eq!(1,                       data_set.num_global_attrs());
+/// assert_eq!(true,                    data_set.has_global_attr(GLOBAL_ATTR_NAME));
+/// assert_eq!(Some(GLOBAL_ATTR_LEN),   data_set.get_global_attr_len(GLOBAL_ATTR_NAME));
+/// assert_eq!(Some(DataType::I32),     data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME));
+///
+/// // Get the `i32` stored values through the data set
+/// assert_eq!(None,                        data_set.get_global_attr_i8(GLOBAL_ATTR_NAME));
+/// assert_eq!(None,                        data_set.get_global_attr_u8(GLOBAL_ATTR_NAME));
+/// assert_eq!(None,                        data_set.get_global_attr_i16(GLOBAL_ATTR_NAME));
+/// assert_eq!(Some(&GLOBAL_ATTR_DATA[..]), data_set.get_global_attr_i32(GLOBAL_ATTR_NAME));
+/// assert_eq!(None,                        data_set.get_global_attr_f32(GLOBAL_ATTR_NAME));
+/// assert_eq!(None,                        data_set.get_global_attr_f64(GLOBAL_ATTR_NAME));
+///
+/// // Or through a reference to the global attribute
+/// let global_attr: &Attribute = data_set.get_global_attr(GLOBAL_ATTR_NAME).unwrap();
+///
+/// assert_eq!(GLOBAL_ATTR_NAME,    global_attr.name());
+/// assert_eq!(GLOBAL_ATTR_LEN,     global_attr.len());
+/// assert_eq!(DataType::I32,       global_attr.data_type());
+///
+/// assert_eq!(None,                        global_attr.get_i8());
+/// assert_eq!(None,                        global_attr.get_u8());
+/// assert_eq!(None,                        global_attr.get_i16());
+/// assert_eq!(Some(&GLOBAL_ATTR_DATA[..]), global_attr.get_i32());
+/// assert_eq!(None,                        global_attr.get_f32());
+/// assert_eq!(None,                        global_attr.get_f64());
 /// ```
+///
+/// ### Rename a global attribute
+///
+/// ```
+/// use netcdf3::{DataSet, DataType};
+///
+/// const GLOBAL_ATTR_NAME_1: &str = "attr_1";
+/// const GLOBAL_ATTR_NAME_2: &str = "attr_2";
+/// const GLOBAL_ATTR_DATA: [i32; 3] = [1, 2, 3];
+/// const GLOBAL_ATTR_LEN: usize = GLOBAL_ATTR_DATA.len();
+///
+///
+/// // Create a data set
+/// let mut data_set: DataSet = DataSet::new();
+/// // Create a `i32` variable attribute
+/// data_set.add_global_attr_i32(GLOBAL_ATTR_NAME_1, GLOBAL_ATTR_DATA.to_vec()).unwrap();
+///
+/// assert_eq!(1,                       data_set.num_global_attrs());
+/// assert_eq!(true,                    data_set.has_global_attr(GLOBAL_ATTR_NAME_1));
+/// assert_eq!(Some(GLOBAL_ATTR_LEN),   data_set.get_global_attr_len(GLOBAL_ATTR_NAME_1));
+/// assert_eq!(Some(DataType::I32),     data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME_1));
+/// assert_eq!(false,                   data_set.has_global_attr(GLOBAL_ATTR_NAME_2));
+/// assert_eq!(None,                    data_set.get_global_attr_len(GLOBAL_ATTR_NAME_2));
+/// assert_eq!(None,                    data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME_2));
+///
+/// assert_eq!(Some(&GLOBAL_ATTR_DATA[..]), data_set.get_global_attr_i32(GLOBAL_ATTR_NAME_1));
+/// assert_eq!(None,                        data_set.get_global_attr_i32(GLOBAL_ATTR_NAME_2));
+///
+/// data_set.rename_global_attr(GLOBAL_ATTR_NAME_1, GLOBAL_ATTR_NAME_2).unwrap();
+///
+/// assert_eq!(1,                       data_set.num_global_attrs());
+/// assert_eq!(false,                   data_set.has_global_attr(GLOBAL_ATTR_NAME_1));
+/// assert_eq!(None,                    data_set.get_global_attr_len(GLOBAL_ATTR_NAME_1));
+/// assert_eq!(None,                    data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME_1));
+/// assert_eq!(true,                    data_set.has_global_attr(GLOBAL_ATTR_NAME_2));
+/// assert_eq!(Some(GLOBAL_ATTR_LEN),   data_set.get_global_attr_len(GLOBAL_ATTR_NAME_2));
+/// assert_eq!(Some(DataType::I32),     data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME_2));
+///
+/// assert_eq!(None,                        data_set.get_global_attr_i32(GLOBAL_ATTR_NAME_1));
+/// assert_eq!(Some(&GLOBAL_ATTR_DATA[..]), data_set.get_global_attr_i32(GLOBAL_ATTR_NAME_2));
+/// ```
+///
+/// ### Remove a global attribute
+///
+/// ```
+/// use netcdf3::{DataSet, DataType};
+///
+/// const GLOBAL_ATTR_NAME: &str = "attr_1";
+/// const GLOBAL_ATTR_DATA: [i32; 3] = [1, 2, 3];
+/// const GLOBAL_ATTR_DATA_LEN: usize = GLOBAL_ATTR_DATA.len();
+///
+///
+/// // Create a data set
+/// let mut data_set: DataSet = DataSet::new();
+/// // Create a `i32` variable attribute
+/// data_set.add_global_attr_i32(GLOBAL_ATTR_NAME, GLOBAL_ATTR_DATA.to_vec()).unwrap();
+///
+/// assert_eq!(1,                           data_set.num_global_attrs());
+/// assert_eq!(true,                        data_set.has_global_attr(GLOBAL_ATTR_NAME));
+/// assert_eq!(Some(GLOBAL_ATTR_DATA_LEN),  data_set.get_global_attr_len(GLOBAL_ATTR_NAME));
+/// assert_eq!(Some(DataType::I32),         data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME));
+/// assert_eq!(Some(&GLOBAL_ATTR_DATA[..]), data_set.get_global_attr_i32(GLOBAL_ATTR_NAME));
+///
+/// data_set.remove_global_attr(GLOBAL_ATTR_NAME).unwrap();
+///
+/// assert_eq!(0,      data_set.num_global_attrs());
+/// assert_eq!(false,  data_set.has_global_attr(GLOBAL_ATTR_NAME));
+/// assert_eq!(None,   data_set.get_global_attr_len(GLOBAL_ATTR_NAME));
+/// assert_eq!(None,   data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME));
+/// assert_eq!(None,   data_set.get_global_attr_i32(GLOBAL_ATTR_NAME));
+/// ```
+///
+/// ## Variable attributes
+///
+/// ### Create and read a variable attribute
+///
+/// ```
+/// use netcdf3::{DataSet, Variable, Attribute, DataType, InvalidDataSet};
+///
+/// const VAR_NAME: &str = "var_1";
+/// const VAR_ATTR_NAME: &str = "attr_1";
+/// const VAR_ATTR_DATA: [i32; 3] = [1, 2, 3];
+/// const VAR_ATTR_DATA_LEN: usize = VAR_ATTR_DATA.len();
+///
+/// // Create a data set
+/// let mut data_set = DataSet::new();
+/// // Create a `i8` variable
+/// data_set.add_var_i8::<&str>(VAR_NAME, &vec![]).unwrap();
+/// // Create a `i32` variable attribute
+/// data_set.add_var_attr_i32(VAR_NAME, VAR_ATTR_NAME, VAR_ATTR_DATA.to_vec()).unwrap();
+///
+/// assert_eq!(Some(1),             data_set.num_var_attrs(VAR_NAME));
+/// assert_eq!(Some(true),          data_set.has_var_attr(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(Some(VAR_ATTR_DATA_LEN),  data_set.get_var_attr_len(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(Some(DataType::I32), data_set.get_var_attr_data_type(VAR_NAME, VAR_ATTR_NAME));
+///
+/// // Get the `i32` stored values through the data set
+/// assert_eq!(None,                        data_set.get_var_attr_i8(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(None,                        data_set.get_var_attr_u8(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(None,                        data_set.get_var_attr_i16(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(Some(&VAR_ATTR_DATA[..]),    data_set.get_var_attr_i32(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(None,                        data_set.get_var_attr_f32(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(None,                        data_set.get_var_attr_f64(VAR_NAME, VAR_ATTR_NAME));
+///
+/// // Or through a reference to the variable attribute
+/// let var_attr: &Attribute = data_set.get_var_attr(VAR_NAME, VAR_ATTR_NAME).unwrap();
+///
+/// assert_eq!(VAR_ATTR_NAME,               var_attr.name());
+/// assert_eq!(VAR_ATTR_DATA_LEN,           var_attr.len());
+/// assert_eq!(DataType::I32,               var_attr.data_type());
+///
+/// assert_eq!(None,                        var_attr.get_i8());
+/// assert_eq!(None,                        var_attr.get_u8());
+/// assert_eq!(None,                        var_attr.get_i16());
+/// assert_eq!(Some(&VAR_ATTR_DATA[..]),    var_attr.get_i32());
+/// assert_eq!(None,                        var_attr.get_f32());
+/// assert_eq!(None,                        var_attr.get_f64());
+/// ```
+///
+/// ### Rename a variable attribute
+///
+/// ```
+/// use netcdf3::{DataSet, DataType};
+///
+/// const VAR_NAME: &'static  str = "var_1";
+/// const VAR_ATTR_NAME_1: &str = "attr_1";
+/// const VAR_ATTR_NAME_2: &str = "attr_2";
+/// const VAR_ATTR_DATA: [i32; 3] = [1, 2, 3];
+/// const VAR_ATTR_DATA_LEN: usize = VAR_ATTR_DATA.len();
+///
+/// // Create a data set
+/// let mut data_set = DataSet::new();
+/// // Create a `i8` variable
+/// data_set.add_var_i8::<&str>(VAR_NAME, &vec![]).unwrap();
+/// // Create a `i32` variable attribute
+/// data_set.add_var_attr_i32(VAR_NAME, VAR_ATTR_NAME_1, VAR_ATTR_DATA.to_vec()).unwrap();
+///
+/// assert_eq!(Some(1),                     data_set.num_var_attrs(VAR_NAME));
+/// assert_eq!(Some(true),                  data_set.has_var_attr(VAR_NAME, VAR_ATTR_NAME_1));
+/// assert_eq!(Some(VAR_ATTR_DATA_LEN),     data_set.get_var_attr_len(VAR_NAME, VAR_ATTR_NAME_1));
+/// assert_eq!(Some(&VAR_ATTR_DATA[..]),    data_set.get_var_attr_i32(VAR_NAME, VAR_ATTR_NAME_1));
+/// assert_eq!(Some(DataType::I32),         data_set.get_var_attr_data_type(VAR_NAME, VAR_ATTR_NAME_1));
+/// assert_eq!(Some(false),                 data_set.has_var_attr(VAR_NAME, VAR_ATTR_NAME_2));
+/// assert_eq!(None,                        data_set.get_var_attr_len(VAR_NAME, VAR_ATTR_NAME_2));
+/// assert_eq!(None,                        data_set.get_var_attr_data_type(VAR_NAME, VAR_ATTR_NAME_2));
+/// assert_eq!(None,                        data_set.get_var_attr_i32(VAR_NAME, VAR_ATTR_NAME_2));
+///
+/// // Rename the variable
+/// data_set.rename_var_attr(VAR_NAME, VAR_ATTR_NAME_1, VAR_ATTR_NAME_2).unwrap();
+///
+/// assert_eq!(Some(1),                     data_set.num_var_attrs(VAR_NAME));
+/// assert_eq!(Some(false),                 data_set.has_var_attr(VAR_NAME, VAR_ATTR_NAME_1));
+/// assert_eq!(None,                        data_set.get_var_attr_len(VAR_NAME, VAR_ATTR_NAME_1));
+/// assert_eq!(None,                        data_set.get_var_attr_data_type(VAR_NAME, VAR_ATTR_NAME_1));
+/// assert_eq!(None,                        data_set.get_var_attr_i32(VAR_NAME, VAR_ATTR_NAME_1));
+/// assert_eq!(Some(true),                  data_set.has_var_attr(VAR_NAME, VAR_ATTR_NAME_2));
+/// assert_eq!(Some(VAR_ATTR_DATA_LEN),     data_set.get_var_attr_len(VAR_NAME, VAR_ATTR_NAME_2));
+/// assert_eq!(Some(&VAR_ATTR_DATA[..]),    data_set.get_var_attr_i32(VAR_NAME, VAR_ATTR_NAME_2));
+/// assert_eq!(Some(DataType::I32),         data_set.get_var_attr_data_type(VAR_NAME, VAR_ATTR_NAME_2));
+/// ```
+///
+/// ### Remove a variable attribute
+///
+/// ```
+/// use netcdf3::{DataSet, DataType};
+///
+/// const VAR_NAME: &'static  str = "var_1";
+/// const VAR_ATTR_NAME: &str = "attr_1";
+/// const VAR_ATTR_DATA: [i32; 3] = [1, 2, 3];
+/// const VAR_ATTR_DATA_LEN: usize = VAR_ATTR_DATA.len();
+///
+/// // Create a data set
+/// let mut data_set = DataSet::new();
+/// // Create a `i8` variable
+/// data_set.add_var_i8::<&str>(VAR_NAME, &vec![]).unwrap();
+/// // Create a `i32` variable attribute
+/// data_set.add_var_attr_i32(VAR_NAME, VAR_ATTR_NAME, VAR_ATTR_DATA.to_vec()).unwrap();
+///
+/// assert_eq!(Some(1),                     data_set.num_var_attrs(VAR_NAME));
+/// assert_eq!(Some(true),                  data_set.has_var_attr(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(Some(VAR_ATTR_DATA_LEN),     data_set.get_var_attr_len(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(Some(DataType::I32),         data_set.get_var_attr_data_type(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(Some(&VAR_ATTR_DATA[..]),    data_set.get_var_attr_i32(VAR_NAME, VAR_ATTR_NAME));
+///
+/// // Remove the variable
+/// data_set.remove_var_attr(VAR_NAME, VAR_ATTR_NAME).unwrap();
+///
+/// assert_eq!(Some(0),     data_set.num_var_attrs(VAR_NAME));
+/// assert_eq!(Some(false), data_set.has_var_attr(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(None,        data_set.get_var_attr_len(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(None,        data_set.get_var_attr_data_type(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(None,        data_set.get_var_attr_i32(VAR_NAME, VAR_ATTR_NAME));
+/// ```
+///
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Attribute {
     pub(crate) name: String,
@@ -31,7 +256,7 @@ pub struct Attribute {
 }
 
 impl Attribute {
-    /// Create a new attribute from a `DataVector`.
+    /// Creates a new attribute from a `DataVector`.
     pub(crate) fn new(name: &str, data: DataVector) -> Result<Attribute, String> {
         Attribute::check_attr_name(name)?;
         Ok(Attribute {
@@ -39,78 +264,122 @@ impl Attribute {
             data: data,
         })
     }
-    /// Create a new attribute containing i8 data.
-    pub(in crate::data_set) fn new_i8_attr(name: &str, data: Vec<i8>) -> Result<Attribute, String> {
+    /// Creates a new attribute containing i8 data.
+    pub(in crate::data_set) fn new_i8(name: &str, data: Vec<i8>) -> Result<Attribute, String> {
         let data = DataVector::I8(data);
         Attribute::new(name, data)
     }
 
-    /// Create a new attribute containing *u8* data.
-    pub(in crate::data_set) fn new_u8_attr(name: &str, data: Vec<u8>) -> Result<Attribute, String> {
+    /// Creates a new attribute containing *u8* data.
+    pub(in crate::data_set) fn new_u8(name: &str, data: Vec<u8>) -> Result<Attribute, String> {
         let data = DataVector::U8(data);
         Attribute::new(name, data)
     }
 
     /// Create a new attribute containing *i16* data.
-    pub(in crate::data_set) fn new_i16_attr(name: &str, data: Vec<i16>) -> Result<Attribute, String> {
+    pub(in crate::data_set) fn new_i16(name: &str, data: Vec<i16>) -> Result<Attribute, String> {
         let data = DataVector::I16(data);
         Attribute::new(name, data)
     }
 
-    /// Create a new attribute containing *i32* data.
-    pub(crate) fn new_i32_attr(name: &str, data: Vec<i32>) -> Result<Attribute, String> {
+    /// Creates a new attribute containing *i32* data.
+    pub(crate) fn new_i32(name: &str, data: Vec<i32>) -> Result<Attribute, String> {
         let data = DataVector::I32(data);
         Attribute::new(name, data)
     }
 
-    /// Create a new attribute containing *f32* data.
-    pub(crate) fn new_f32_attr(name: &str, data: Vec<f32>) -> Result<Attribute, String> {
+    /// Creates a new attribute containing *f32* data.
+    pub(crate) fn new_f32(name: &str, data: Vec<f32>) -> Result<Attribute, String> {
         let data = DataVector::F32(data);
         Attribute::new(name, data)
     }
 
-    /// Create a new attribute containing *f64* data.
-    pub(crate) fn new_f64_attr(name: &str, data: Vec<f64>) -> Result<Attribute, String> {
+    /// Creates a new attribute containing *f64* data.
+    pub(crate) fn new_f64(name: &str, data: Vec<f64>) -> Result<Attribute, String> {
         let data = DataVector::F64(data);
         Attribute::new(name, data)
     }
-    /// Return the name of the attribute.
+
+    /// Returns the name of the attribute.
     pub fn name(&self) -> &str {
         &self.name
     }
-    /// Return the NetCDF-3 data type of the attribute : *i8*, *u8*, ...
+    /// Returns the NetCDF-3 data type of the attribute : *i8*, *u8*, ...
     pub fn data_type(&self) -> DataType {
         self.data.data_type()
     }
 
-    /// Return the number of elements (the length) of the attribute.
+    /// Returns the number of elements (the length) of the attribute.
     pub fn len(&self) -> usize {
         self.data.len()
     }
 
-    /// Returns a reference of the data vector, if it contains `i8` elements,
-    /// otherwise returns `None`.
-    pub fn get_i8(&self) -> Option<&Vec<i8>> {
+    /// Returns a reference of the `i8` data or `None` of the attribute has not `i8` data.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use netcdf3::{DataSet, Attribute, DataType};
+    ///
+    /// const GLOBAL_ATTR_NAME: &str = "attr_1";
+    /// const GLOBAL_ATTR_DATA: [i8; 3] = [1, 2, 3];
+    /// const GLOBAL_ATTR_DATA_LEN: usize = GLOBAL_ATTR_DATA.len();
+    ///
+    /// // Create a data set and add a `i8` global attribute
+    /// // -------------------------------------------------
+    /// let mut data_set = DataSet::new();
+    /// data_set.add_global_attr_i8(GLOBAL_ATTR_NAME, GLOBAL_ATTR_DATA.to_vec()).unwrap();
+    ///
+    /// // Get the stored `i8` data
+    /// // ------------------------
+    /// assert_eq!(true,                        data_set.has_global_attr(GLOBAL_ATTR_NAME));
+    /// assert_eq!(Some(GLOBAL_ATTR_DATA_LEN),  data_set.get_global_attr_len(GLOBAL_ATTR_NAME));
+    /// assert_eq!(Some(DataType::I8),          data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME));
+    ///
+    /// // Through the data set
+    /// assert_eq!(Some(&GLOBAL_ATTR_DATA[..]), data_set.get_global_attr_i8(GLOBAL_ATTR_NAME));
+    /// assert_eq!(None,                        data_set.get_global_attr_u8(GLOBAL_ATTR_NAME));
+    /// assert_eq!(None,                        data_set.get_global_attr_i16(GLOBAL_ATTR_NAME));
+    /// assert_eq!(None,                        data_set.get_global_attr_i32(GLOBAL_ATTR_NAME));
+    /// assert_eq!(None,                        data_set.get_global_attr_f32(GLOBAL_ATTR_NAME));
+    /// assert_eq!(None,                        data_set.get_global_attr_f64(GLOBAL_ATTR_NAME));
+    ///
+    /// // Or through a reference
+    /// let global_attr: &Attribute = data_set.get_global_attr(GLOBAL_ATTR_NAME).unwrap();
+    ///
+    /// assert_eq!(Some(&GLOBAL_ATTR_DATA[..]), global_attr.get_i8());
+    /// assert_eq!(None,                        global_attr.get_u8());
+    /// assert_eq!(None,                        global_attr.get_i16());
+    /// assert_eq!(None,                        global_attr.get_i32());
+    /// assert_eq!(None,                        global_attr.get_f32());
+    /// assert_eq!(None,                        global_attr.get_f64());
+    /// ```
+    pub fn get_i8(&self) -> Option<&[i8]> {
         self.data.get_i8()
     }
 
-    pub fn get_u8(&self) -> Option<&Vec<u8>> {
+    /// Returns a reference of the `u8` data or `None` of the attribute has not `u8` data (refer to the method [get_i8](struct.Attribute.html#method.get_i8)).
+    pub fn get_u8(&self) -> Option<&[u8]> {
         self.data.get_u8()
     }
 
-    pub fn get_i16(&self) -> Option<&Vec<i16>> {
+    /// Returns a reference of the `i16` data or `None` of the attribute has not `i16` data (refer to the method [get_i8](struct.Attribute.html#method.get_i8)).
+    pub fn get_i16(&self) -> Option<&[i16]> {
         self.data.get_i16()
     }
 
-    pub fn get_i32(&self) -> Option<&Vec<i32>> {
+    /// Returns a reference of the `i32` data or `None` of the attribute has not `i32` data (refer to the method [get_i8](struct.Attribute.html#method.get_i8)).
+    pub fn get_i32(&self) -> Option<&[i32]> {
         self.data.get_i32()
     }
 
-    pub fn get_f32(&self) -> Option<&Vec<f32>> {
+    /// Returns a reference of the `f32` data or `None` of the attribute has not `f32` data (refer to the method [get_i8](struct.Attribute.html#method.get_i8)).
+    pub fn get_f32(&self) -> Option<&[f32]> {
         self.data.get_f32()
     }
 
-    pub fn get_f64(&self) -> Option<&Vec<f64>> {
+    /// Returns a reference of the `f64` data or `None` of the attribute has not `f64` data (refer to the method [get_i8](struct.Attribute.html#method.get_i8)).
+    pub fn get_f64(&self) -> Option<&[f64]> {
         self.data.get_f64()
     }
 
@@ -126,12 +395,12 @@ impl Attribute {
 mod tests {
     use super::{Attribute, DataType};
     #[test]
-    fn test_new_i8_attr() {
-        let attr = Attribute::new_i8_attr("attr1", vec![0, 1, 2, 3]).unwrap();
+    fn test_new_i8() {
+        let attr = Attribute::new_i8("attr1", vec![0, 1, 2, 3]).unwrap();
 
         assert_eq!(DataType::I8, attr.data_type());
         assert!(attr.get_i8().is_some());
-        assert_eq!(&vec![0_i8, 1, 2, 3], attr.get_i8().unwrap());
+        assert_eq!(&[0_i8, 1, 2, 3], attr.get_i8().unwrap());
 
         assert_eq!(None, attr.get_u8());
         assert_eq!(None, attr.get_i16());

@@ -63,7 +63,7 @@ impl DataVector {
 
     /// Return the reference to the vector of *NetCDF-2 i8s*, if the type of the data is `DataType::I8`,
     /// otherwise return `None`.
-    pub(crate) fn get_i8(&self) -> Option<&Vec<i8>> {
+    pub(crate) fn get_i8(&self) -> Option<&[i8]> {
         return match self {
             DataVector::I8(data) => Some(data),
             DataVector::U8(_) => None,
@@ -74,7 +74,7 @@ impl DataVector {
         };
     }
 
-    pub(crate) fn get_u8(&self) -> Option<&Vec<u8>> {
+    pub(crate) fn get_u8(&self) -> Option<&[u8]> {
         return match self {
             DataVector::I8(_) => None,
             DataVector::U8(data) => Some(data),
@@ -85,7 +85,7 @@ impl DataVector {
         };
     }
 
-    pub(crate) fn get_i16(&self) -> Option<&Vec<i16>> {
+    pub(crate) fn get_i16(&self) -> Option<&[i16]> {
         return match self {
             DataVector::I8(_) => None,
             DataVector::U8(_) => None,
@@ -96,7 +96,7 @@ impl DataVector {
         };
     }
 
-    pub(crate) fn get_i32(&self) -> Option<&Vec<i32>> {
+    pub(crate) fn get_i32(&self) -> Option<&[i32]> {
         return match self {
             DataVector::I8(_) => None,
             DataVector::U8(_) => None,
@@ -107,7 +107,7 @@ impl DataVector {
         };
     }
 
-    pub(crate) fn get_f32(&self) -> Option<&Vec<f32>> {
+    pub(crate) fn get_f32(&self) -> Option<&[f32]> {
         return match self {
             DataVector::I8(_) => None,
             DataVector::U8(_) => None,
@@ -118,7 +118,7 @@ impl DataVector {
         };
     }
 
-    pub(crate) fn get_f64(&self) -> Option<&Vec<f64>> {
+    pub(crate) fn get_f64(&self) -> Option<&[f64]> {
         return match self {
             DataVector::I8(_) => None,
             DataVector::U8(_) => None,

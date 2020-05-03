@@ -1,6 +1,21 @@
-/// Return `true` if `name` follows the NetCDF-3 naming convention.
-pub(crate) fn is_valid_name(name: &str) -> bool {
-    // check the first u8acter
+/// Checks that `name` follows the NetCDF-3 naming convention.
+///
+/// # Examples
+///
+/// ```
+/// use netcdf3::{is_valid_name};
+///
+/// assert_eq!(true,    is_valid_name("title"));
+/// assert_eq!(true,    is_valid_name("standard_name"));
+/// assert_eq!(true,    is_valid_name("_FillValue"));
+/// assert_eq!(true,    is_valid_name("café"));  // the UTF-8 encoded characters are supported
+/// assert_eq!(true,    is_valid_name("A"));
+///
+/// assert_eq!(false,   is_valid_name(""));
+/// assert_eq!(false,   is_valid_name("!invalid_name"));
+/// ```
+pub fn is_valid_name(name: &str) -> bool {
+    // check the first character
     match name.chars().nth(0) {
         None => {
             // then the name string is empty

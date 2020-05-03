@@ -3,10 +3,15 @@ rust:
   - stable
   - beta
   - nightly
+  - 1.39.0
 jobs:
   allow_failures:
     - rust: nightly
 cache: cargo
 script:
   - cargo build --verbose --all
-  - cargo test --lib --all
+  - cargo test --verbose --all
+branches:
+  only:
+    - master
+    - dev
