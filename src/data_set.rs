@@ -1,5 +1,6 @@
 mod dimension;
 pub use dimension::{Dimension, DimensionType};
+pub(crate) use dimension::DimensionSize;
 
 mod attribute;
 pub use attribute::Attribute;
@@ -11,13 +12,194 @@ mod tests;
 
 use std::{cell::RefMut, ops::Deref, rc::Rc};
 
-use crate::{data_vector::DataVector, DataType, InvalidDataSet};
+use crate::{DataType, InvalidDataSet};
+use crate::data_vector::DataVector;
 
-/// NetCDF-3 data set
+/// Default fill value for the `i8` elements (same value as `NC_FILL_BYTE` defined in the header file [netcdf.h](https://www.unidata.ucar.edu/software/netcdf/docs/netcdf_8h.html))
+///
+/// ```
+/// # use netcdf3::NC_FILL_I8;
+/// // Written bytes in the NetCDF-3 files
+/// assert_eq!([0x81], NC_FILL_I8.to_be_bytes());
+/// ```
+pub const NC_FILL_I8: i8 = -127;
+/// Default fill value for the `u8` elements (same value as `NC_FILL_CHAR` defined in the header file [netcdf.h](https://www.unidata.ucar.edu/software/netcdf/docs/netcdf_8h.html))
+///
+/// ```
+/// # use netcdf3::NC_FILL_U8;
+/// // Written bytes in the NetCDF-3 files
+/// assert_eq!([0x00], NC_FILL_U8.to_be_bytes());
+/// ```
+pub const NC_FILL_U8: u8 = 0;
+/// Default fill value for the `i16` elements (same value as `NC_FILL_SHORT` defined in the header file [netcdf.h](https://www.unidata.ucar.edu/software/netcdf/docs/netcdf_8h.html))
+///
+/// ```
+/// # use netcdf3::NC_FILL_I16;
+/// // Written bytes in the NetCDF-3 files
+/// assert_eq!([0x80, 0x01], NC_FILL_I16.to_be_bytes());
+/// ```
+pub const NC_FILL_I16: i16 = -32767;
+/// Default fill value for the `i32` elements (same value as `NC_FILL_INT` defined in the header file [netcdf.h](https://www.unidata.ucar.edu/software/netcdf/docs/netcdf_8h.html))
+///
+/// ```
+/// # use netcdf3::NC_FILL_I32;
+/// // Written bytes in the NetCDF-3 files
+/// assert_eq!([0x80, 0x00, 0x00, 0x01], NC_FILL_I32.to_be_bytes());
+/// ```
+pub const NC_FILL_I32: i32 = -2147483647;
+/// Default fill value for the `f32` elements (same value as `NC_FILL_FLOAT` defined in the header file [netcdf.h](https://www.unidata.ucar.edu/software/netcdf/docs/netcdf_8h.html))
+///
+/// ```
+/// # use netcdf3::NC_FILL_F32;
+/// // Written bytes in the NetCDF-3 files
+/// assert_eq!([0x7c, 0xf0, 0x00, 0x00], NC_FILL_F32.to_be_bytes());
+/// ```
+pub const NC_FILL_F32: f32 = 9.9692099683868690e+36;
+/// Default fill value for the `f64` elements (same value as `NC_FILL_DOUBLE` defined in the header file [netcdf.h](https://www.unidata.ucar.edu/software/netcdf/docs/netcdf_8h.html))
+///
+/// ```
+/// # use netcdf3::NC_FILL_F64;
+/// // Written bytes in the NetCDF-3 files
+/// assert_eq!([0x47, 0x9e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00], NC_FILL_F64.to_be_bytes());
+/// ```
+pub const NC_FILL_F64: f64 = 9.9692099683868690e+36;
+
+/// Maximum length of the *fixed-size* dimensions
+///
+/// # Example: define a valid *fixed-size* dimension
+///
+/// ```
+/// use netcdf3::{DataSet, NC_MAX_DIM_SIZE};
+///
+/// const DIM_NAME: &str = "dim_1";
+///
+/// // Create a data set
+/// let mut data_set: DataSet = DataSet::new();
+/// assert_eq!(0,                       data_set.num_dims());
+/// assert_eq!(false,                   data_set.has_dim(DIM_NAME));
+/// assert_eq!(None,                    data_set.dim_size(DIM_NAME));
+///
+/// // Add a *fixed-size* dimension with the maximum size allowed.
+/// data_set.add_fixed_dim(DIM_NAME, NC_MAX_DIM_SIZE).unwrap();
+///
+/// assert_eq!(1,                       data_set.num_dims());
+/// assert_eq!(true,                    data_set.has_dim(DIM_NAME));
+/// assert_eq!(Some(NC_MAX_DIM_SIZE),   data_set.dim_size(DIM_NAME));
+/// ```
+///
+/// # Error: try to define a too lonng valid *fixed-size* dimension
+///
+/// ```
+/// use netcdf3::{DataSet, NC_MAX_DIM_SIZE};
+/// use netcdf3::error::InvalidDataSet;
+///
+/// const DIM_NAME: &str = "loo_long_dim";
+///
+/// // Create a data set
+/// let mut data_set: DataSet = DataSet::new();
+/// assert_eq!(0,                       data_set.num_dims());
+/// assert_eq!(false,                   data_set.has_dim(DIM_NAME));
+/// assert_eq!(None,                    data_set.dim_size(DIM_NAME));
+///
+///
+/// // Try to add another *fixed-size* dimension with a too long size.
+/// assert_eq!(
+///     InvalidDataSet::MaximumFixedDimensionSizeExceeded{
+///         dim_name: String::from(DIM_NAME),
+///         get: NC_MAX_DIM_SIZE + 1,
+///     },
+///     data_set.add_fixed_dim(DIM_NAME, NC_MAX_DIM_SIZE + 1).unwrap_err()
+/// );
+///
+/// // Create a data set
+/// let mut data_set: DataSet = DataSet::new();
+/// assert_eq!(0,                       data_set.num_dims());
+/// assert_eq!(false,                   data_set.has_dim(DIM_NAME));
+/// assert_eq!(None,                    data_set.dim_size(DIM_NAME));
+/// ```
+pub const NC_MAX_DIM_SIZE: usize = (std::i32::MAX - 3) as usize;
+
+/// Maximum number of dimensions per variable
+///
+/// # Example
+///
+/// ```
+/// use netcdf3::{DataSet, NC_MAX_VAR_DIMS};
+///
+/// const VAR_NAME: &str = "valid_var";
+///
+/// // Create a data set
+/// let mut data_set: DataSet = DataSet::new();
+/// assert_eq!(0,                       data_set.num_dims());
+/// assert_eq!(0,                       data_set.num_vars());
+/// assert_eq!(false,                   data_set.has_var(VAR_NAME));
+///
+/// // Add enough dimensions
+/// let mut dim_list: Vec<String> = Vec::with_capacity(NC_MAX_VAR_DIMS);
+/// for i in 0..(NC_MAX_VAR_DIMS) {
+///     let dim_name: String = format!("dim_{:0>4}", i);
+///     data_set.add_fixed_dim(&dim_name, 1);
+///     dim_list.push(dim_name);
+/// }
+/// assert_eq!(NC_MAX_VAR_DIMS,         data_set.num_dims());
+/// assert_eq!(0,                       data_set.num_vars());
+/// assert_eq!(false,                   data_set.has_var(VAR_NAME));
+///
+/// // Add a valid variable
+/// assert_eq!(NC_MAX_VAR_DIMS,             dim_list.len());
+/// data_set.add_var_i32(VAR_NAME, &dim_list).unwrap();
+///
+/// assert_eq!(NC_MAX_VAR_DIMS,         data_set.num_dims());
+/// assert_eq!(1,                       data_set.num_vars());
+/// assert_eq!(true,                    data_set.has_var(VAR_NAME));
+///
+/// ```
+///
+/// # Error: try to add a variable defined over too much dimensions
+///
+/// ```
+/// use netcdf3::{DataSet, NC_MAX_VAR_DIMS};
+/// use netcdf3::error::InvalidDataSet;
+///
+/// const VAR_NAME: &str = "invalid_var";
+///
+/// // Create a data set
+/// let mut data_set: DataSet = DataSet::new();
+/// assert_eq!(0,                       data_set.num_dims());
+/// assert_eq!(0,                       data_set.num_vars());
+/// assert_eq!(false,                   data_set.has_var(VAR_NAME));
+///
+/// // Add enough dimensions
+/// let mut too_long_dim_list: Vec<String> = Vec::with_capacity(NC_MAX_VAR_DIMS + 1);
+/// for i in 0..(NC_MAX_VAR_DIMS + 1) {
+///     let dim_name: String  = format!("dim_{:0>4}", i);
+///     data_set.add_fixed_dim(&dim_name, 1);
+///     too_long_dim_list.push(dim_name);
+/// }
+/// assert_eq!(NC_MAX_VAR_DIMS + 1,     data_set.num_dims());
+/// assert_eq!(0,                       data_set.num_vars());
+/// assert_eq!(false,                   data_set.has_var(VAR_NAME));
+///
+/// // Try to add a variable defined over top much dimensions
+/// assert_eq!(NC_MAX_VAR_DIMS + 1,         too_long_dim_list.len());
+/// assert_eq!(
+///     InvalidDataSet::MaximumDimensionsPerVariableExceeded{
+///         var_name: String::from(VAR_NAME),
+///         num_dims: NC_MAX_VAR_DIMS + 1
+///     },
+///     data_set.add_var_i32(VAR_NAME, &too_long_dim_list).unwrap_err(),
+/// );
+/// assert_eq!(NC_MAX_VAR_DIMS + 1,     data_set.num_dims());
+/// assert_eq!(0,                       data_set.num_vars());
+/// assert_eq!(false,                   data_set.has_var(VAR_NAME));
+/// ```
+pub const NC_MAX_VAR_DIMS: usize = 1024;
+
+/// Allows to define the NetCDF-3 data sets
 ///
 /// # Examples
 ///
-/// # Create a data set
+/// # Define a data set
 ///
 /// ```
 /// use std::rc::Rc;
@@ -39,65 +221,43 @@ use crate::{data_vector::DataVector, DataType, InvalidDataSet};
 ///
 /// // Define dimensions
 /// // -----------------
-/// data_set.add_fixed_dim("latitude",  LATITUDE_DIM_SIZE).unwrap();
-/// data_set.add_fixed_dim("longitude", LONGITUDE_DIM_SIZE).unwrap();
-/// data_set.set_unlimited_dim("time",  TIME_DIM_SIZE).unwrap();
+/// data_set.add_fixed_dim("latitude",          LATITUDE_DIM_SIZE).unwrap();
+/// data_set.add_fixed_dim("longitude",         LONGITUDE_DIM_SIZE).unwrap();
+/// data_set.set_unlimited_dim("time",          TIME_DIM_SIZE).unwrap();
 ///
 /// // Define variables and their attributes
 /// // -------------------------------------
 /// // latitude
-/// data_set.add_var_f32("latitude",        &["latitude"]).unwrap();
-/// data_set.add_var_attr_u8("latitude",    "standard_name", String::from("latitude").into_bytes()).unwrap();
-/// data_set.add_var_attr_u8("latitude",    "long_name", String::from("LATITUDE").into_bytes()).unwrap();
-/// data_set.add_var_attr_u8("latitude",    "units", String::from("degrees_north").into_bytes()).unwrap();
-/// data_set.add_var_attr_u8("latitude",    "axis", String::from("Y").into_bytes()).unwrap();
+/// data_set.add_var_f32("latitude",            &["latitude"]).unwrap();
+/// data_set.add_var_attr_u8("latitude",        "standard_name", String::from("latitude").into_bytes()).unwrap();
+/// data_set.add_var_attr_u8("latitude",        "long_name", String::from("LATITUDE").into_bytes()).unwrap();
+/// data_set.add_var_attr_u8("latitude",        "units", String::from("degrees_north").into_bytes()).unwrap();
+/// data_set.add_var_attr_u8("latitude",        "axis", String::from("Y").into_bytes()).unwrap();
 /// // longitude
-/// data_set.add_var_f32("longitude",       &["longitude"]).unwrap();
-/// data_set.add_var_attr_u8("longitude",   "standard_name", String::from("longitude").into_bytes()).unwrap();
-/// data_set.add_var_attr_u8("longitude",   "long_name", String::from("LONGITUDE").into_bytes()).unwrap();
-/// data_set.add_var_attr_u8("longitude",   "units", String::from("degrees_east").into_bytes()).unwrap();
-/// data_set.add_var_attr_u8("longitude",   "axis", String::from("X").into_bytes()).unwrap();
+/// data_set.add_var_f32("longitude",           &["longitude"]).unwrap();
+/// data_set.add_var_attr_u8("longitude",       "standard_name", String::from("longitude").into_bytes()).unwrap();
+/// data_set.add_var_attr_u8("longitude",       "long_name", String::from("LONGITUDE").into_bytes()).unwrap();
+/// data_set.add_var_attr_u8("longitude",       "units", String::from("degrees_east").into_bytes()).unwrap();
+/// data_set.add_var_attr_u8("longitude",       "axis", String::from("X").into_bytes()).unwrap();
 /// // time
-/// data_set.add_var_f32("time",        &["time"]).unwrap();
-/// data_set.add_var_attr_u8("time",    "standard_name", String::from("time").into_bytes()).unwrap();
-/// data_set.add_var_attr_u8("time",    "long_name", String::from("TIME").into_bytes()).unwrap();
-/// data_set.add_var_attr_u8("time",    "units", String::from("hours since 1970-01-01 00:00:00").into_bytes()).unwrap();
-/// data_set.add_var_attr_u8("time",    "calendar", String::from("gregorian").into_bytes()).unwrap();
-/// data_set.add_var_attr_u8("time",    "axis", String::from("T").into_bytes()).unwrap();
+/// data_set.add_var_f32("time",                &["time"]).unwrap();
+/// data_set.add_var_attr_u8("time",            "standard_name", String::from("time").into_bytes()).unwrap();
+/// data_set.add_var_attr_u8("time",            "long_name", String::from("TIME").into_bytes()).unwrap();
+/// data_set.add_var_attr_u8("time",            "units", String::from("hours since 1970-01-01 00:00:00").into_bytes()).unwrap();
+/// data_set.add_var_attr_u8("time",            "calendar", String::from("gregorian").into_bytes()).unwrap();
+/// data_set.add_var_attr_u8("time",            "axis", String::from("T").into_bytes()).unwrap();
 /// // air_temperature
 /// data_set.add_var_f64("air_temperature",     &["time", "latitude", "longitude"]).unwrap();
 /// data_set.add_var_attr_u8("air_temperature", "standard_name", String::from("air_temperature").into_bytes()).unwrap();
 /// data_set.add_var_attr_u8("air_temperature", "long_name", String::from("AIR TEMPERATURE").into_bytes()).unwrap();
 /// data_set.add_var_attr_u8("air_temperature", "units", String::from("Celsius").into_bytes()).unwrap();
 ///
-/// // Initialize the data vectors
-/// // ---------------------------
-/// let latitude_data: Vec<f32>         = (0..LATITUDE_DIM_SIZE).map(|x| x as f32).collect();
-/// let longitude_data: Vec<f32>        = (0..LONGITUDE_DIM_SIZE).map(|x| x as f32).collect();
-/// let time_data: Vec<f32>             = (438_300..(438_300 + TIME_DIM_SIZE)).map(|x| x as f32).collect(); // 2020, the 1st-january
-/// let air_temperature_data: Vec<f64>  = (0..AIR_TEMPERATURE_VAR_LEN).map(|x| x as f64).collect();
-/// 
-/// // Set data in each variable
-/// // -------------------------
-/// data_set.set_var_f32("latitude",        latitude_data.clone()).unwrap();
-/// data_set.set_var_f32("longitude",       longitude_data.clone()).unwrap();
-/// data_set.set_var_f32("time",            time_data.clone()).unwrap();
-/// data_set.set_var_f64("air_temperature", air_temperature_data.clone()).unwrap();
-///
-/// // Retrieve the `air_temperature` data from the data set
-/// //------------------------------------------------------
-/// assert_eq!(None,                                    data_set.get_var_i8("air_temperature"));
-/// assert_eq!(None,                                    data_set.get_var_u8("air_temperature"));
-/// assert_eq!(None,                                    data_set.get_var_i16("air_temperature"));
-/// assert_eq!(None,                                    data_set.get_var_i32("air_temperature"));
-/// assert_eq!(None,                                    data_set.get_var_f32("air_temperature"));
-/// assert_eq!(Some(air_temperature_data.as_slice()),   data_set.get_var_f64("air_temperature"));
 /// ```
 #[derive(Debug, PartialEq)]
 pub struct DataSet {
-    unlimited_dim: Option<Rc<Dimension>>,
+    pub(crate) unlimited_dim: Option<Rc<Dimension>>,
     pub(crate) dims: Vec<Rc<Dimension>>,
-    attrs: Vec<Attribute>,
+    pub(crate) attrs: Vec<Attribute>,
     pub(crate) vars: Vec<Variable>,
 }
 
@@ -176,7 +336,7 @@ impl DataSet {
     }
 
     /// Returns the names all the dimensions defined in the data set.
-    pub fn get_dim_names(&self) -> Vec<String>
+    pub fn dim_names(&self) -> Vec<String>
     {
         self.dims.iter().map(|dim| {
             dim.name().to_string()
@@ -198,7 +358,7 @@ impl DataSet {
     /// Returns the length of the dimension.
     ///
     /// Returns `None` if the dimension does not exist.
-    pub fn get_dim_size(&self, dim_name: &str) -> Option<usize> {
+    pub fn dim_size(&self, dim_name: &str) -> Option<usize> {
         self.find_dim_from_name(dim_name)
             .map(|(_dim_index, dim)| dim.size())
     }
@@ -206,7 +366,7 @@ impl DataSet {
     /// Returns the type of the dimension (*fixed-size* or *unlimited-size*).
     ///
     /// Returns `None` if the dimension does not exist.
-    pub fn get_dim_type(&self, dim_name: &str) -> Option<DimensionType> {
+    pub fn dim_type(&self, dim_name: &str) -> Option<DimensionType> {
         self.find_dim_from_name(dim_name).map(|(_dim_index, dim)| dim.dim_type())
     }
 
@@ -285,16 +445,33 @@ impl DataSet {
             });
     }
 
-    pub fn get_dims_from_ids(&self, dim_ids: &[usize]) -> Result<Vec<Rc<Dimension>>, InvalidDataSet> {
-        let invalid_dim_ids: Vec<usize> = dim_ids
+    pub fn get_dims_from_dim_ids(&self, dim_ids: &[usize]) -> Result<Vec<Rc<Dimension>>, InvalidDataSet> {
+        let searched_dim_ids = dim_ids;
+        let not_found_dim_ids: Vec<usize> = dim_ids
             .iter()
             .filter(|dim_id: &&usize| self.dims.get(**dim_id).is_none())
             .map(|i| i.clone())
             .collect();
-        if !invalid_dim_ids.is_empty() {
-            return Err(InvalidDataSet::DimensionsIdsNotValid(invalid_dim_ids));
+        if !not_found_dim_ids.is_empty() {
+            return Err(InvalidDataSet::DimensionIdsNotFound{
+                defined: (0..self.dims.len()).collect(),
+                searched: searched_dim_ids.to_vec(),
+                not_found: not_found_dim_ids,
+            });
         }
         Ok(dim_ids.iter().map(|dim_id: &usize| Rc::clone(&self.dims[*dim_id])).collect())
+    }
+
+    pub(crate) fn get_var_dim_ids(&self, var_name: &str) -> Option<Vec<usize>> {
+        let var: &Variable = self.find_var_from_name(var_name).ok()?.1;
+        let var_dims: &[Rc<Dimension>] = &var.dims;
+        let var_dim_ids: Vec<usize> = var_dims.iter().map(|var_dim: &Rc<Dimension>| {
+            self.dims.iter()
+                .position(|data_set_dim: &Rc<Dimension>| Rc::ptr_eq(data_set_dim, var_dim))
+                .expect("Shouldn't have occurred! All variable dimensions are defined in the data set, their positions should have been found.")
+            // Can't panic :all dimensions
+        }).collect();
+        Some(var_dim_ids)
     }
     // ----------------------------------------------------------------
     //
@@ -306,7 +483,7 @@ impl DataSet {
     ///
     /// # Examples
     ///
-    /// Add a variable
+    /// Add a 2D variable
     ///
     /// ```
     /// use netcdf3::{DataSet, DataType};
@@ -321,16 +498,22 @@ impl DataSet {
     /// assert_eq!(1, data_set.num_vars());
     /// ```
     ///
-    /// Add an empty variable
+    /// Add a scalar variable
     ///
     /// ```
     /// use netcdf3::{DataSet, DataType};
     ///
+    /// const SCALAR_VAR_NAME: &str = "scalar_var";
+    ///
     /// let mut data_set = DataSet::new();
     ///
-    /// assert_eq!(0, data_set.num_vars());
-    /// let _ = data_set.add_var("empty_variable", &[] as &[&str] /* no dimensions*/, DataType::U8).unwrap();
-    /// assert_eq!(1, data_set.num_vars());
+    /// assert_eq!(0,                   data_set.num_vars());
+    /// assert_eq!(None,                data_set.var_len(SCALAR_VAR_NAME));
+    ///
+    /// let _ = data_set.add_var(SCALAR_VAR_NAME, &[] as &[&str] /* no dimensions*/, DataType::I32).unwrap();
+    ///
+    /// assert_eq!(1,                   data_set.num_vars());
+    /// assert_eq!(Some(1),             data_set.var_len(SCALAR_VAR_NAME));
     /// ```
     pub fn add_var<T: std::convert::AsRef<str>>(&mut self, var_name: &str, dims_name: &[T], data_type: DataType) -> Result<(), InvalidDataSet> {
 
@@ -351,7 +534,7 @@ impl DataSet {
             if !undefined_dims.is_empty() {
                 return Err(InvalidDataSet::DimensionsNotDefined{
                     var_name: var_name.to_string(),
-                    get_undef_dim_names: undefined_dims,
+                    undef_dim_names: undefined_dims,
                 });
             }
             var_dims
@@ -412,17 +595,16 @@ impl DataSet {
         return self.find_var_from_name(var_name).is_ok();
     }
 
-    /// Returns a reference to the variable, or `None`.
-    pub fn get_var(&self, var_name: &str) -> Option<&Variable> {
+    pub fn is_record_var(&self, var_name: &str) -> Option<bool> {
         return self.find_var_from_name(var_name)
             .map(|(_var_index, var): (usize, &Variable)| {
-                var
+                var.is_record_var()
             })
             .ok();
     }
 
     /// Returns the length (total number of elements) of the variable.
-    pub fn get_var_len(&self, var_name: &str) -> Option<usize> {
+    pub fn var_len(&self, var_name: &str) -> Option<usize> {
         return self.find_var_from_name(var_name)
             .map(|(_var_index, var): (usize, &Variable)| {
                 var.len()
@@ -431,12 +613,21 @@ impl DataSet {
     }
 
     /// Returns the data type of the variable, or `None`.
-    pub fn get_var_data_type(&self, var_name: &str) -> Option<DataType> {
+    pub fn var_data_type(&self, var_name: &str) -> Option<DataType> {
         return self.find_var_from_name(var_name)
         .map(|(_var_index, var): (usize, &Variable)| {
             var.data_type()
         })
         .ok();
+    }
+
+    /// Returns a reference to the variable, or `None`.
+    pub fn get_var(&self, var_name: &str) -> Option<&Variable> {
+        return self.find_var_from_name(var_name)
+            .map(|(_var_index, var): (usize, &Variable)| {
+                var
+            })
+            .ok();
     }
 
     /// Returns a mutable reference to the variable
@@ -511,96 +702,6 @@ impl DataSet {
             .ok_or(InvalidDataSet::VariableNotDefined(var_name.to_string()));
     }
 
-    /// Returns the `i8` values from the variable (see the [method](struct.Variable.html#method.get_i8))
-    pub fn get_var_i8(&self, var_name: &str) -> Option<&[i8]>
-    {
-        let var: &Variable = self.find_var_from_name(var_name).ok()?.1;
-        var.get_i8()
-    }
-
-    /// Returns the `u8` values from the variable (see the [method](struct.Variable.html#method.get_u8))
-    pub fn get_var_u8(&self, var_name: &str) -> Option<&[u8]>
-    {
-        let var: &Variable = self.find_var_from_name(var_name).ok()?.1;
-        var.get_u8()
-    }
-
-    /// Returns the `i16` values from the variable (see the [method](struct.Variable.html#method.get_16))
-    pub fn get_var_i16(&self, var_name: &str) -> Option<&[i16]>
-    {
-        let var: &Variable = self.find_var_from_name(var_name).ok()?.1;
-        var.get_i16()
-    }
-
-    /// Returns the `i32` values from the variable (see the [method](struct.Variable.html#method.get_i32))
-    pub fn get_var_i32(&self, var_name: &str) -> Option<&[i32]>
-    {
-        let var: &Variable = self.find_var_from_name(var_name).ok()?.1;
-        var.get_i32()
-    }
-
-    /// Returns the `f32` values from the variable (see the [method](struct.Variable.html#method.get_f32))
-    pub fn get_var_f32(&self, var_name: &str) -> Option<&[f32]>
-    {
-        let var: &Variable = self.find_var_from_name(var_name).ok()?.1;
-        var.get_f32()
-    }
-
-    /// Returns the `f64` values from the variable (see the [method](struct.Variable.html#method.get_f64))
-    pub fn get_var_f64(&self, var_name: &str) -> Option<&[f64]>
-    {
-        let var: &Variable = self.find_var_from_name(var_name).ok()?.1;
-        var.get_f64()
-    }
-
-    /// Set `i8` data into the variable. (see the [method](struct.Variable.html#method.set_i8) )
-    pub fn set_var_i8(&mut self, var_name: &str, data: Vec<i8>) -> Result<(), InvalidDataSet> {
-        // Search the variable, must be already defined
-        let var_index: usize = self.find_var_from_name(var_name)?.0;
-        let var: &mut Variable = &mut self.vars[var_index];
-        var.set_i8(data)
-    }
-
-    /// Set `u8` data into the variable. (see the [method](struct.Variable.html#method.set_u8) )
-    pub fn set_var_u8(&mut self, var_name: &str, data: Vec<u8>) -> Result<(), InvalidDataSet> {
-        // Search the variable, must be already defined
-        let var_index: usize = self.find_var_from_name(var_name)?.0;
-        let var: &mut Variable = &mut self.vars[var_index];
-        var.set_u8(data)
-    }
-
-    /// Set `i16` data into the variable. (see the [method](struct.Variable.html#method.set_i16) )
-    pub fn set_var_i16(&mut self, var_name: &str, data: Vec<i16>) -> Result<(), InvalidDataSet> {
-        // Search the variable, must be already defined
-        let var_index: usize = self.find_var_from_name(var_name)?.0;
-        let var: &mut Variable = &mut self.vars[var_index];
-        var.set_i16(data)
-    }
-
-    /// Set `i32` data into the variable. (see the [method](struct.Variable.html#method.set_i32) )
-    pub fn set_var_i32(&mut self, var_name: &str, data: Vec<i32>) -> Result<(), InvalidDataSet> {
-        // Search the variable, must be already defined
-        let var_index: usize = self.find_var_from_name(var_name)?.0;
-        let var: &mut Variable = &mut self.vars[var_index];
-        var.set_i32(data)
-    }
-
-    /// Set `f32` data into the variable. (see the [method](struct.Variable.html#method.set_f32) )
-    pub fn set_var_f32(&mut self, var_name: &str, data: Vec<f32>) -> Result<(), InvalidDataSet> {
-        // Search the variable, must be already defined
-        let var_index: usize = self.find_var_from_name(var_name)?.0;
-        let var: &mut Variable = &mut self.vars[var_index];
-        var.set_f32(data)
-    }
-
-    /// Set `f64` data into the variable. (see the [method](struct.Variable.html#method.set_f64) )
-    pub fn set_var_f64(&mut self, var_name: &str, data: Vec<f64>) -> Result<(), InvalidDataSet> {
-        // Search the variable, must be already defined
-        let var_index: usize = self.find_var_from_name(var_name)?.0;
-        let var: &mut Variable = &mut self.vars[var_index];
-        var.set_f64(data)
-    }
-
     // ----------------------------------------------------------------
     //
     //                  Variable attributes
@@ -624,6 +725,11 @@ impl DataSet {
         let var: &mut Variable = &mut self.vars[var_index];
         var.add_attr_u8(attr_name, var_attr_value)?;
         Ok(())
+    }
+
+    // Add a `u8` attribute in the variable from a UTF-8 `String`.
+    pub fn add_var_attr_string<T: AsRef<str>>(&mut self, var_name: &str, attr_name: &str, var_attr_value: T) -> Result<(), InvalidDataSet> {
+        self.add_var_attr_u8(var_name, attr_name, String::from(var_attr_value.as_ref()).into_bytes())
     }
 
     // Add a `i16` attribute in the variable.
@@ -716,20 +822,6 @@ impl DataSet {
             .ok();
     }
 
-    /// Returns the length (number of elements) of the variable attribute.
-    pub fn has_var_attr_len(&self, var_name: &str, attr_name: &str) -> Option<usize> {
-        return self.find_var_attr_from_name(var_name, attr_name)
-            .map(|((_var_index, _var), (_attr_index, attr)): ((usize, &Variable), (usize, &Attribute))| { attr.len()})
-            .ok();
-    }
-
-    /// Returns the length (number of elements) of the variable attribute.
-    pub fn has_var_attr_data_type(&self, var_name: &str, attr_name: &str) -> Option<DataType> {
-        return self.find_var_attr_from_name(var_name, attr_name)
-            .map(|((_var_index, _var), (_attr_index, attr)): ((usize, &Variable), (usize, &Attribute))| { attr.data_type()})
-            .ok();
-    }
-
     /// Returns the number of attributes of the variable.
     ///
     /// Returns `None` if the variable does not exist.
@@ -761,38 +853,58 @@ impl DataSet {
         Ok(((var_index, ref_var), (var_attr_index, ref_var_attr)))
     }
 
-    // Returns the `i8` data of the variable attribute (see the [method](struct.Attribute.html#method.get_i8))
-    pub fn get_var_attr_i8(&mut self, var_name: &str, attr_name: &str) -> Option<&[i8]> {
+    /// Returns the attribute value as a `&[i8]`.
+    ///
+    /// Also see the method [Attribute::get_i8](struct.Attribute.html#method.get_i8).
+    pub fn get_var_attr_i8(&self, var_name: &str, attr_name: &str) -> Option<&[i8]> {
         let attr: &Attribute = (self.find_var_attr_from_name(var_name, attr_name).ok()?.1).1;
         attr.get_i8()
     }
 
-    // Returns the `u8` data of the variable attribute (see the [method](struct.Attribute.html#method.get_u8))
-    pub fn get_var_attr_u8(&mut self, var_name: &str, attr_name: &str) -> Option<&[u8]> {
+    /// Returns the attribute value as a `&[u8]`.
+    ///
+    /// Also see the method [Attribute::get_u8](struct.Attribute.html#method.get_u8).8))
+    pub fn get_var_attr_u8(&self, var_name: &str, attr_name: &str) -> Option<&[u8]> {
         let attr: &Attribute = (self.find_var_attr_from_name(var_name, attr_name).ok()?.1).1;
         attr.get_u8()
     }
 
-    // Returns the `i16` data of the variable attribute (see the [method](struct.Attribute.html#method.get_i16))
-    pub fn get_var_attr_i16(&mut self, var_name: &str, attr_name: &str) -> Option<&[i16]> {
+    /// Returns the attribute value as a `String`.
+    ///
+    /// Also see the method [Attribute::get_as_string](struct.Attribute.html#method.get_as_string)
+    pub fn get_var_attr_as_string(&self, var_name: &str, attr_name: &str) -> Option<String> {
+        let attr: &Attribute = (self.find_var_attr_from_name(var_name, attr_name).ok()?.1).1;
+        attr.get_as_string()
+    }
+
+    /// Returns the attribute value as a `&[i16]`.
+    ///
+    /// Also see the method [Attribute::get_i16](struct.Attribute.html#method.get_i16).
+    pub fn get_var_attr_i16(&self, var_name: &str, attr_name: &str) -> Option<&[i16]> {
         let attr: &Attribute = (self.find_var_attr_from_name(var_name, attr_name).ok()?.1).1;
         attr.get_i16()
     }
 
-    // Returns the `i32` data of the variable attribute (see the [method](struct.Attribute.html#method.get_i32))
-    pub fn get_var_attr_i32(&mut self, var_name: &str, attr_name: &str) -> Option<&[i32]> {
+    /// Returns the attribute value as a `&[i32]`.
+    ///
+    /// Also see the method [Attribute::get_i32](struct.Attribute.html#method.get_i32).
+    pub fn get_var_attr_i32(&self, var_name: &str, attr_name: &str) -> Option<&[i32]> {
         let attr: &Attribute = (self.find_var_attr_from_name(var_name, attr_name).ok()?.1).1;
         attr.get_i32()
     }
 
-    // Returns the `f32` data of the variable attribute (see the [method](struct.Attribute.html#method.get_f32))
-    pub fn get_var_attr_f32(&mut self, var_name: &str, attr_name: &str) -> Option<&[f32]> {
+    /// Returns the attribute value as a `&[f32]`.
+    ///
+    /// Also see the method [Attribute::get_f32](struct.Attribute.html#method.get_f32).
+    pub fn get_var_attr_f32(&self, var_name: &str, attr_name: &str) -> Option<&[f32]> {
         let attr: &Attribute = (self.find_var_attr_from_name(var_name, attr_name).ok()?.1).1;
         attr.get_f32()
     }
 
-    // Returns the `f64` data of the variable attribute (see the [method](struct.Attribute.html#method.get_f64))
-    pub fn get_var_attr_f64(&mut self, var_name: &str, attr_name: &str) -> Option<&[f64]> {
+    /// Returns the attribute value as a `&[f64]`.
+    ///
+    /// Also see the method [Attribute::get_f64](struct.Attribute.html#method.get_f64
+    pub fn get_var_attr_f64(&self, var_name: &str, attr_name: &str) -> Option<&[f64]> {
         let attr: &Attribute = (self.find_var_attr_from_name(var_name, attr_name).ok()?.1).1;
         attr.get_f64()
     }
@@ -887,6 +999,11 @@ impl DataSet {
         Ok(())
     }
 
+    /// Adds a global `u8` type attribute in the data set.
+    pub fn add_global_attr_string<T: AsRef<str>>(&mut self, attr_name: &str, attr_data: T) -> Result<(), InvalidDataSet> {
+        self.add_global_attr_u8(attr_name, String::from(attr_data.as_ref()).into_bytes())
+    }
+
     /// Adds a global `i16` type attribute in the data set.
     pub fn add_global_attr_i16(&mut self, attr_name: &str, attr_data: Vec<i16>) -> Result<(), InvalidDataSet> {
         if self.find_global_attr_from_name(attr_name).is_ok() {
@@ -974,63 +1091,144 @@ impl DataSet {
         Ok(self.attrs.remove(removed_attr_index))
     }
 
-    /// Returns the `i8` values the a global attribute (see the [method](struct.Attribute.html#method.get_i8))
+    /// Returns the attribute value as a `&[i8]`.
+    ///
+    /// Also see the method [Attribute::get_i8](struct.Attribute.html#method.get_i8).
     pub fn get_global_attr_i8(&self, attr_name: &str) -> Option<&[i8]> {
         let attr: &Attribute = self.find_global_attr_from_name(attr_name).ok()?.1;
         attr.get_i8()
     }
 
-    /// Returns the `u8` values the a global attribute (see the [method](struct.Attribute.html#method.get_u8))
+    /// Returns the attribute value as a `&[u8]`.
+    ///
+    /// Also see the method [Attribute::get_u8](struct.Attribute.html#method.get_u8).
     pub fn get_global_attr_u8(&self, attr_name: &str) -> Option<&[u8]> {
         let attr: &Attribute = self.find_global_attr_from_name(attr_name).ok()?.1;
         attr.get_u8()
     }
 
-    /// Returns the `i16` values the a global attribute (see the [method](struct.Attribute.html#method.get_i16))
+    /// Returns the global attribute value as a `String`.
+    ///
+    /// Also see the method [Attribute::get_as_string](struct.Attribute.html#method.get_as_string)
+    pub fn get_global_attr_as_string(&self, attr_name: &str) -> Option<String> {
+        let attr: &Attribute = self.find_global_attr_from_name(attr_name).ok()?.1;
+        attr.get_as_string()
+    }
+
+    /// Returns the attribute value as a `&[i16]`.
+    ///
+    /// Also see the method [Attribute::get_i16](struct.Attribute.html#method.get_i16
     pub fn get_global_attr_i16(&self, attr_name: &str) -> Option<&[i16]> {
         let attr: &Attribute = self.find_global_attr_from_name(attr_name).ok()?.1;
         attr.get_i16()
     }
 
-    /// Returns the `i32` values the a global attribute (see the [method](struct.Attribute.html#method.get_i32))
+    /// Returns the attribute value as a `&[i32]`.
+    ///
+    /// Also see the method [Attribute::get_i32](struct.Attribute.html#method.get_i32).
     pub fn get_global_attr_i32(&self, attr_name: &str) -> Option<&[i32]> {
         let attr: &Attribute = self.find_global_attr_from_name(attr_name).ok()?.1;
         attr.get_i32()
     }
 
-    /// Returns the `f32` values the a global attribute (see the [method](struct.Attribute.html#method.get_f32))
+    /// Returns the attribute value as a `&[f32]`.
+    ///
+    /// Also see the method [Attribute::get_f32](struct.Attribute.html#method.get_f32).)
     pub fn get_global_attr_f32(&self, attr_name: &str) -> Option<&[f32]> {
         let attr: &Attribute = self.find_global_attr_from_name(attr_name).ok()?.1;
         attr.get_f32()
     }
 
-    /// Returns the `f64` values the a global attribute (see the [method](struct.Attribute.html#method.get_f64))
+    /// Returns the attribute value as a `&[f64]`.
+    ///
+    /// Also see the method [Attribute::get_f64](struct.Attribute.html#method.get_f64)
     pub fn get_global_attr_f64(&self, attr_name: &str) -> Option<&[f64]> {
         let attr: &Attribute = self.find_global_attr_from_name(attr_name).ok()?.1;
         attr.get_f64()
     }
 
-    // Returns the size (number of bytes) required by each record stored in the data file.
-    pub fn num_bytes_per_record(&self) -> usize
+    /// Returns the size (number of bytes) required by each record stored in the data file.
+    ///
+    /// Returns `None` if the data set has not a *unlimited-size* dimension.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use netcdf3::{DataSet, Variable};
+    /// const UNLIM_DIM_NAME: &str = "unlim_dim";
+    /// const UNLIM_DIM_SIZE: usize = 10;
+    ///
+    /// const FIXED_DIM_NAME: &str = "fixed_dim";
+    /// const FIXED_DIM_SIZE: usize = 20;
+    ///
+    /// const VAR_1D_NAME: &str = "var_1D";
+    /// const VAR_2D_NAME: &str = "var_2D";
+    ///
+    /// // No *unlimited-size* dimension is defined
+    /// let mut data_set: DataSet = DataSet::new();
+    /// assert_eq!(false,   data_set.has_unlimited_dim());
+    /// assert_eq!(None,    data_set.record_size());
+    ///
+    /// // The *unlimited-size* dimension is defined here, but no variable uses it
+    /// data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+    /// assert_eq!(true,                                            data_set.has_unlimited_dim());
+    /// assert_eq!(Some(0),                                         data_set.record_size());
+    ///
+    /// // First : Add a 1D variable (a vector) over the *unlimited-size* dimension
+    /// data_set.add_var_i8(VAR_1D_NAME, &[UNLIM_DIM_NAME]).unwrap();
+    /// const VAR_1D_CHUNK_SIZE: usize = 4;  // 1 useful byte + 3 zero-padding bytes
+    /// assert_eq!(true,                                            data_set.has_unlimited_dim());
+    /// assert_eq!(Some(VAR_1D_CHUNK_SIZE),                         data_set.record_size());
+    ///
+    /// // Second : Add a 2D variable (a matrix) over the* unlimited-size* dimension
+    /// data_set.add_fixed_dim(FIXED_DIM_NAME, FIXED_DIM_SIZE).unwrap();
+    /// data_set.add_var_i8(VAR_2D_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+    /// const VAR_2D_CHUNK_SIZE: usize = 20;  // 20 bytes
+    ///
+    /// // Then: the record size has increased
+    /// assert_eq!(true,                                            data_set.has_unlimited_dim());
+    /// assert_eq!(Some(VAR_1D_CHUNK_SIZE + VAR_2D_CHUNK_SIZE),     data_set.record_size());
+    /// ```
+    pub fn record_size(&self) -> Option<usize>
     {
-        return self.vars.iter()
-            .filter(|var| {  // keep only the record-variables
-                var.is_record_var()
-            }).map(|var| {
-                var.chunk_size()
-            }).fold(0, |sum, chunk_size| {
-                sum + chunk_size
+        if ! self.has_unlimited_dim() {
+            return None;
+        }
+        else {
+            let (record_vars, _fixed_size_vars): (Vec<&Variable>, Vec<&Variable>) = self.vars.iter().partition(|var: &&Variable| var.is_record_var());
+            let record_size: usize = record_vars.into_iter().fold(0, |sum:usize , var: &Variable| {
+                sum + var.chunk_size()
             });
-    }
-
-    // Returns the number of records stored in data file.
-    pub fn num_records(&self) -> usize {
-        match &self.unlimited_dim {
-            None => 0,
-            Some(dim) => dim.size()
+            Some(record_size)
         }
     }
 
+    /// Returns the number of records stored in data file.
+    ///
+    /// Returns `None` if the data set has not an *unlimited-size* dimension.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use netcdf3::DataSet;
+    /// const UNLIM_DIM_NAME: &str = "unlim_dim";
+    /// const UNLIM_DIM_SIZE: usize = 10;
+    ///
+    /// let mut data_set: DataSet = DataSet::new();
+    ///
+    /// // No *unlimited-size* dimension is defined
+    /// assert_eq!(false,   data_set.has_unlimited_dim());
+    /// assert_eq!(None,    data_set.num_records());
+    ///
+    /// // The *unlimited-size* dimension is defined here
+    /// data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE);
+    /// assert_eq!(true,                    data_set.has_unlimited_dim());
+    /// assert_eq!(Some(UNLIM_DIM_SIZE),    data_set.num_records());
+    /// ```
+    pub fn num_records(&self) -> Option<usize> {
+        match &self.unlimited_dim {
+            None => None,
+            Some(dim) => Some(dim.size())
+        }
+    }
 }
-
-

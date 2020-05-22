@@ -2,25 +2,29 @@ use std::io::Write;
 
 use tempdir::TempDir;
 
-/// Empty data set test file name.
+// Empty data set
 pub static EMPTY_DATA_SET_FILE_NAME: &'static str = "empty_data_set";
 pub static EMPTY_DATA_SET_FILE_BYTES: &'static[u8] = include_bytes!("../../empty_data_set.nc");
 
-/// NetCDF-3 (classic version) test file name.
+// NetCDF-3 (classic version)
 pub static NC3_CLASSIC_FILE_NAME: &'static str = "temp_3D_classic.nc";
 pub static NC3_CLASSIC_FILE_BYTES: &'static[u8] = include_bytes!("../../temp_3D_classic.nc");
 
-/// NetCDF-3 (64-bit offset version) test file name.
+// NetCDF-3 (64-bit offset version)
 pub static NC3_64BIT_OFFSET_FILE_NAME: &'static str = "temp_3D_64bit_offset.nc";
 pub static NC3_64BIT_OFFSET_FILE_BYTES: &'static[u8] = include_bytes!("../../temp_3D_64bit_offset.nc");
 
-/// Empty variables test file name.
-pub static EMPTY_VARIABLES_FILE_NAME: &'static str = "empty_vars.nc";
-pub static EMPTY_VARIABLES_FILE_BYTES: &'static[u8] = include_bytes!("../../empty_vars.nc");
+// Scalar variables contaning the default `NC_FILL` values
+pub static NC3_FILL_VALUES_FILE_NAME: &'static str = "nc_fill_values.nc";
+pub static NC3_FILL_VALUES_FILE_BYTES: &'static[u8] = include_bytes!("../../nc_fill_values.nc");
 
-/// Scalar variables test file name.
+// Scalar variables
 pub static SCALAR_VARIABLES_FILE_NAME: &'static str = "scalar_vars.nc";
 pub static SCALAR_VARIABLES_FILE_BYTES: &'static[u8] = include_bytes!("../../scalar_vars.nc");
+
+// Another basic Classic NetCDF-3 file used by documention examples
+pub static NC3_BASIC_CLASSIC_FILE_NAME: &'static str = "basic_temp_3D_classic.nc";
+pub static NC3_BASIC_CLASSIC_FILE_BYTES: &'static[u8] = include_bytes!("../../basic_temp_3D_classic.nc");
 
 /// Copies bytes to a file located in a temporary directory.
 ///

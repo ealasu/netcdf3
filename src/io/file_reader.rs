@@ -1,9 +1,10 @@
-mod tests;
+mod tests_file_reader;
 
 use std::convert::TryFrom;
 use std::rc::Rc;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 
 use byteorder::{ReadBytesExt, BigEndian};
 
@@ -34,42 +35,63 @@ use crate::{
     DataSet,
     DataType,
     Dimension,
+    DataVector,
     Variable,
     Version,
-    error::{
-        IOError, InvalidDataSet,
-        input_error::{ParseHeaderError, ParseErrorKind, NomError, ReadDataError},
-    },
-    io::{compute_num_bytes_zero_padding, ABSENT_TAG, DIMENSION_TAG, VARIABLE_TAG, ATTRIBUTE_TAG},
-};
-use crate::{
-    data_vector::DataVector,
+    error::ReadError,
+    error::parse_header_error::{ParseHeaderError, ParseHeaderErrorKind, NomError},
+    io::{compute_padding_size, Offset, ABSENT_TAG, DIMENSION_TAG, VARIABLE_TAG, ATTRIBUTE_TAG},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Offset {
-    I32(i32),
-    I64(i64),
-}
 
-impl std::convert::From<Offset> for i64 {
-
-    fn from(offset: Offset) -> Self
-    {
-        match offset {
-            Offset::I32(value) => value as i64,
-            Offset::I64(value) => value,
-        }
-    }
-}
-
-
-/// Allows to parse headers and read data from NetCDF-3 files.
+/// Allows to read NetCDF-3 files (the *classic* and the *64-bit offset* versions).
 ///
 /// # Example
 ///
 /// ```
-/// use netcdf3::{FileReader, DataSet, Variable, Version, DataType};
+/// use std::collections::HashMap;
+/// use netcdf3::{FileReader, DataSet, DataVector, DataType, Version, DimensionType};
+///
+/// const LATITUDE_DIM_NAME: &str = "latitude";
+/// const LATITUDE_VAR_NAME: &str = LATITUDE_DIM_NAME;
+/// const LATITUDE_VAR_DATA: [f32; 3] = [0.0, 0.5, 1.0];
+/// const LATITUDE_VAR_LEN: usize = LATITUDE_VAR_DATA.len();
+///
+/// const LONGITUDE_DIM_NAME: &str = "longitude";
+/// const LONGITUDE_VAR_NAME: &str = LONGITUDE_DIM_NAME;
+/// const LONGITUDE_VAR_DATA: [f32; 5] = [0.0, 0.5, 1.0, 1.5, 2.0];
+/// const LONGITUDE_VAR_LEN: usize = LONGITUDE_VAR_DATA.len();
+///
+/// const TIME_DIM_NAME: &str = "time";
+/// const TIME_VAR_NAME: &str = TIME_DIM_NAME;
+/// const TIME_VAR_DATA: [f32; 2] = [438_300.0, 438_324.0];
+/// const TIME_VAR_LEN: usize = TIME_VAR_DATA.len();
+///
+/// const TEMP_I8_VAR_NAME: &str = "temperature_i8";
+/// const TEMP_I8_VAR_DATA: [i8; 30] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+/// const TEMP_I8_VAR_LEN: usize = TEMP_I8_VAR_DATA.len();
+///
+/// const TEMP_U8_VAR_NAME: &str = "temperature_u8";
+/// const TEMP_U8_VAR_DATA: [u8; 30] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+/// const TEMP_U8_VAR_LEN: usize = TEMP_U8_VAR_DATA.len();
+///
+/// const TEMP_I16_VAR_NAME: &str = "temperature_i16";
+/// const TEMP_I16_VAR_DATA: [i16; 30] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+/// const TEMP_I16_VAR_LEN: usize = TEMP_I16_VAR_DATA.len();
+///
+/// const TEMP_I32_VAR_NAME: &str = "temperature_i32";
+/// const TEMP_I32_VAR_DATA: [i32; 30] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+/// const TEMP_I32_VAR_LEN: usize = TEMP_I32_VAR_DATA.len();
+///
+/// const TEMP_F32_VAR_NAME: &str = "temperature_f32";
+/// const TEMP_F32_VAR_DATA: [f32; 30] = [0., 1., 2., 3., 4., 5., 6., 7., 8., 9., 10., 11., 12., 13., 14., 15., 16., 17., 18., 19., 20., 21., 22., 23., 24., 25., 26., 27., 28., 29.];
+/// const TEMP_F32_VAR_LEN: usize = TEMP_F32_VAR_DATA.len();
+///
+/// const TEMP_F64_VAR_NAME: &str = "temperature_f64";
+/// const TEMP_F64_VAR_DATA: [f64; 30] = [0., 1., 2., 3., 4., 5., 6., 7., 8., 9., 10., 11., 12., 13., 14., 15., 16., 17., 18., 19., 20., 21., 22., 23., 24., 25., 26., 27., 28., 29.];
+/// const TEMP_F64_VAR_LEN: usize = TEMP_F64_VAR_DATA.len();
+///
+/// // ...
 /// # use copy_to_tmp_file::{
 /// #     copy_bytes_to_tmp_file,
 /// #     NC3_CLASSIC_FILE_NAME, NC3_CLASSIC_FILE_BYTES,
@@ -78,26 +100,82 @@ impl std::convert::From<Offset> for i64 {
 /// # // Copy bytes to an temporary file
 /// # let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 ///
-/// let (data_set, version): (DataSet, Version) = {
-///     let mut file_reader: FileReader = FileReader::open(input_file_path).unwrap();
-///     assert_eq!(Version::Classic, file_reader.version());
-///     file_reader.read_all_vars().unwrap();
-///     file_reader.close()
-/// };
-/// # tmp_dir.close();
+/// // Read variable data from the file
+/// // ---------------------------------
+/// let mut file_reader: FileReader = FileReader::open(input_file_path).unwrap();
 ///
-/// // The header has been parsed
-/// assert_eq!(Version::Classic, version);
-/// assert_eq!(3, data_set.num_dims());
-/// assert_eq!(1, data_set.num_global_attrs());
-/// assert_eq!(9, data_set.num_vars());
+/// let data_set: &DataSet = file_reader.data_set();
 ///
-/// // And all the variables of the data set have been loaded
-/// let latitude: &Variable = data_set.get_var("latitude").unwrap();
-/// let data: &[f32] = latitude.get_f32().unwrap();
-/// assert_eq!(vec![0.0, 0.5, 1.0], data);
+/// // Get the NetCDf-3 version
+/// // ------------------------
+/// assert_eq!(Version::Classic,                    file_reader.version());
+///
+/// // Get the dimensions
+/// // ------------------
+/// assert_eq!(3,                                   data_set.num_dims());
+///
+/// assert_eq!(true,                                data_set.has_dim(LATITUDE_DIM_NAME));
+/// assert_eq!(Some(LATITUDE_VAR_LEN),              data_set.dim_size(LATITUDE_DIM_NAME));
+/// assert_eq!(Some(DimensionType::FixedSize),      data_set.dim_type(LATITUDE_DIM_NAME));
+///
+/// assert_eq!(true,                                data_set.has_dim(LONGITUDE_DIM_NAME));
+/// assert_eq!(Some(LONGITUDE_VAR_LEN),             data_set.dim_size(LONGITUDE_DIM_NAME));
+/// assert_eq!(Some(DimensionType::FixedSize),      data_set.dim_type(LONGITUDE_DIM_NAME));
+///
+/// assert_eq!(true,                                data_set.has_dim(TIME_DIM_NAME));
+/// assert_eq!(Some(TIME_VAR_LEN),                  data_set.dim_size(TIME_DIM_NAME));
+/// assert_eq!(Some(DimensionType::UnlimitedSize),  data_set.dim_type(TIME_DIM_NAME));
+///
+/// // Get the global attributes
+/// // --------------------------
+/// assert_eq!(2,                                   data_set.num_global_attrs());
+/// assert_eq!("Example of NETCDF3_CLASSIC file",   data_set.get_global_attr_as_string("title").unwrap());
+/// assert_eq!("CF-1.8",                            data_set.get_global_attr_as_string("Conventions").unwrap());
+///
+/// // Get the variable defintions
+/// // ----------------------------
+/// assert_eq!(9,                                   data_set.num_vars());
+///
+/// assert_eq!(true,                                data_set.has_var(LATITUDE_VAR_NAME));
+/// assert_eq!(Some(DataType::F32),                 data_set.var_data_type(LATITUDE_VAR_NAME));
+/// assert_eq!(Some(false),                         data_set.is_record_var(LATITUDE_VAR_NAME));
+/// assert_eq!(Some(LATITUDE_VAR_LEN),              data_set.var_len(LATITUDE_VAR_NAME));
+///
+/// /// ..
+///
+/// // Checks the variable attributes
+/// // ------------------------------
+/// assert_eq!(Some(4),                             data_set.num_var_attrs(LATITUDE_VAR_NAME));
+/// assert_eq!("latitude",                          data_set.get_var_attr_as_string(LATITUDE_VAR_NAME, "standard_name").unwrap());
+/// assert_eq!("LATITUDE",                          data_set.get_var_attr_as_string(LATITUDE_VAR_NAME, "long_name").unwrap());
+/// assert_eq!("degrees_north",                     data_set.get_var_attr_as_string(LATITUDE_VAR_NAME, "units").unwrap());
+/// assert_eq!("Y",                                 data_set.get_var_attr_as_string(LATITUDE_VAR_NAME, "axis").unwrap());
+///
+/// assert_eq!(Some(3),                             data_set.num_var_attrs(TEMP_F32_VAR_NAME));
+/// assert_eq!("air_temperature",                   data_set.get_var_attr_as_string(TEMP_F32_VAR_NAME, "standard_name").unwrap());
+/// assert_eq!("TEMPERATURE",                       data_set.get_var_attr_as_string(TEMP_F32_VAR_NAME, "long_name").unwrap());
+/// assert_eq!("Celsius",                           data_set.get_var_attr_as_string(TEMP_F32_VAR_NAME, "units").unwrap());
 ///
 /// // ...
+///
+/// // Read all the variable data
+/// // --------------------------
+/// let var_data: HashMap<String, DataVector> = file_reader.read_all_vars().unwrap();
+/// let data_set: &DataSet = file_reader.data_set();
+/// assert_eq!(9,                                   var_data.len());
+///
+/// assert_eq!(Some(&LATITUDE_VAR_DATA[..]),        var_data[LATITUDE_VAR_NAME].get_f32());
+/// assert_eq!(Some(&LONGITUDE_VAR_DATA[..]),       var_data[LONGITUDE_VAR_NAME].get_f32());
+/// assert_eq!(Some(&TIME_VAR_DATA[..]),            var_data[TIME_VAR_NAME].get_f32());
+///
+/// assert_eq!(Some(&TEMP_I8_VAR_DATA[..]),         var_data[TEMP_I8_VAR_NAME].get_i8());
+/// assert_eq!(Some(&TEMP_U8_VAR_DATA[..]),         var_data[TEMP_U8_VAR_NAME].get_u8());
+/// assert_eq!(Some(&TEMP_I16_VAR_DATA[..]),        var_data[TEMP_I16_VAR_NAME].get_i16());
+/// assert_eq!(Some(&TEMP_I32_VAR_DATA[..]),        var_data[TEMP_I32_VAR_NAME].get_i32());
+/// assert_eq!(Some(&TEMP_F32_VAR_DATA[..]),        var_data[TEMP_F32_VAR_NAME].get_f32());
+/// assert_eq!(Some(&TEMP_F64_VAR_DATA[..]),        var_data[TEMP_F64_VAR_NAME].get_f64());
+/// // ...
+/// # tmp_dir.close();
 /// ```
 pub struct FileReader {
     data_set: DataSet,
@@ -126,40 +204,7 @@ impl FileReader {
     }
 
     /// Opens the file and parses the header of the NetCDF-3.
-    ///
-    /// **The header is parsed but no variable data is loaded.**
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use netcdf3::{FileReader, DataSet, Version, Variable, DataType};
-    /// # use copy_to_tmp_file::{
-    /// #     copy_bytes_to_tmp_file,
-    /// #     NC3_CLASSIC_FILE_NAME, NC3_CLASSIC_FILE_BYTES,
-    /// # };
-    /// #
-    /// # // Copy bytes to an temporary file
-    /// # let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
-    ///
-    /// let (data_set, version): (DataSet, Version) = {
-    ///     let mut file_reader: FileReader = FileReader::open(input_file_path).unwrap();
-    ///     assert_eq!(Version::Classic, file_reader.version());
-    ///     file_reader.close()
-    /// };
-    /// # tmp_dir.close();
-    ///
-    /// // Header information bave been read by the method `FileReader::open`
-    /// assert_eq!(Version::Classic,         version);
-    /// assert_eq!(true,                     data_set.has_var("latitude"));
-    /// assert_eq!(Some(DataType::F32),      data_set.get_var_data_type("latitude"));
-    ///
-    /// // The variable `latitude` exists but its data have not been read by the method `FileReader::open`
-    /// let latitude: &Variable = data_set.get_var("latitude").unwrap();
-    ///
-    /// assert_eq!(DataType::F32,           latitude.data_type());
-    /// assert_eq!(None,                    latitude.get_f32());
-    /// ```
-    pub fn open<P: AsRef<Path>>(input_file_path: P) -> Result<Self, IOError>
+    pub fn open<P: AsRef<Path>>(input_file_path: P) -> Result<Self, ReadError>
     {
         // Open the file
         let input_file_path: PathBuf = {
@@ -167,16 +212,12 @@ impl FileReader {
             path.push(input_file_path);
             path
         };
-        let mut input_file = std::fs::File::open(input_file_path.clone()).map_err(|err: std::io::Error| {
-            ReadDataError::Read(err.kind())
-        })?;
+        let mut input_file = std::fs::File::open(input_file_path.clone())?;
 
         // Load bytes
         let input: Vec<u8> = {
             let mut input: Vec<u8> = vec![];
-            input_file.read_to_end(&mut input).map_err(|err: std::io::Error| {
-                ReadDataError::Read(err.kind())
-            })?;
+            input_file.read_to_end(&mut input)?;
             input
         };
 
@@ -198,46 +239,30 @@ impl FileReader {
         (self.data_set, self.version)
     }
 
-    /// Reads all variables from the file and stored them into the data set.
+    /// Allows to read all variable data easily.
     ///
-    /// # Example
-    ///
-    /// ```
-    /// use netcdf3::{FileReader, DataSet, Variable, DataType};
-    /// # use copy_to_tmp_file::{
-    /// #     copy_bytes_to_tmp_file,
-    /// #     NC3_CLASSIC_FILE_NAME, NC3_CLASSIC_FILE_BYTES,
-    /// # };
-    /// #
-    /// # // Copy bytes to an temporary file
-    /// # let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
-    ///
-    /// let data_set: DataSet = {
-    ///     let mut file_reader: FileReader = FileReader::open(input_file_path).unwrap();
-    ///     file_reader.read_all_vars().unwrap();
-    ///     file_reader.close().0
-    /// };
-    /// # tmp_dir.close();
-    ///
-    /// // The variable latitude exists and has been loaded
-    /// let latitude: &Variable = data_set.get_var("latitude").unwrap();
-    /// let data: &[f32] = latitude.get_f32().unwrap();
-    /// assert_eq!(vec![0.0, 0.5, 1.0], data);
-    ///
-    /// // ...
-    /// ```
-    pub fn read_all_vars(&mut self) -> Result<(), IOError>
+    /// Also see an example [here](struct.FileReader.html#example).
+    pub fn read_all_vars(&mut self) -> Result<HashMap<String, DataVector>, ReadError>
     {
         let var_names: Vec<String> = self.data_set.get_var_names();
-        self.read_vars(&var_names)
+        var_names.into_iter()
+            .map(|var_name: String| {
+                let var_data: DataVector = self.read_var(&var_name)?;
+                Ok((var_name, var_data))
+            }).collect()
     }
 
-    /// Reads some variables from the file and stored them into the data set.
+    /// Reads data of one variable easily and stored them in a `DataVector`.
     ///
     /// # Example
     ///
     /// ```
-    /// use netcdf3::{FileReader, DataSet, Variable, DataType};
+    /// use netcdf3::{FileReader, DataSet, DataVector, DataType};
+    ///
+    /// const LATITUDE_VAR_NAME: &str = "latitude";
+    /// const LATITUDE_VAR_DATA: [f32; 3] = [0.0, 0.5, 1.0];
+    ///
+    /// // ...
     /// # use copy_to_tmp_file::{
     /// #     copy_bytes_to_tmp_file,
     /// #     NC3_CLASSIC_FILE_NAME, NC3_CLASSIC_FILE_BYTES,
@@ -246,128 +271,223 @@ impl FileReader {
     /// # // Copy bytes to an temporary file
     /// # let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
     ///
-    /// let data_set: DataSet = {
-    ///     let mut file_reader: FileReader = FileReader::open(input_file_path).unwrap();
-    ///     file_reader.read_vars(&["latitude", "time"]).unwrap();
-    ///     file_reader.close().0
-    /// };
-    /// # tmp_dir.close();
+    /// let mut file_reader: FileReader = FileReader::open(input_file_path).unwrap();
     ///
-    /// // Test that not all data have been loaded
-    /// // ---------------------------------------
-    /// // The variable latitude exists and has been loaded
-    /// assert!(data_set.has_var("latitude"));
-    /// let latitude: &Variable = data_set.get_var("latitude").unwrap();
-    /// let data: &[f32] = latitude.get_f32().unwrap();
-    /// assert_eq!(vec![0.0, 0.5, 1.0], data);
+    /// // Read data from the NetCDF-3 file
+    /// // --------------------------------
+    /// assert_eq!(true,                    file_reader.data_set().has_var(LATITUDE_VAR_NAME));
+    /// assert_eq!(Some(DataType::F32),     file_reader.data_set().var_data_type(LATITUDE_VAR_NAME));
     ///
-    /// // The variable time exists and has been loaded
-    /// assert!(data_set.has_var("time"));
-    /// let time: &Variable = data_set.get_var("time").unwrap();
-    /// let data: &[f32] = time.get_f32().unwrap();
-    /// assert_eq!(vec![438300.0, 438324.0], data);
+    /// let data_vec: DataVector = file_reader.read_var(LATITUDE_VAR_NAME).unwrap();
+    /// assert_eq!(DataType::F32,                           data_vec.data_type());
     ///
-    /// // The variable longitude exists but has not been loaded
-    /// assert!(data_set.has_var("longitude"));
-    /// let longitude: &Variable = data_set.get_var("longitude").unwrap();
-    /// assert_eq!(DataType::F32, longitude.data_type());
-    /// assert!(longitude.get_f32().is_none());
+    /// assert_eq!(None,                                    data_vec.get_i8());
+    /// assert_eq!(None,                                    data_vec.get_u8());
+    /// assert_eq!(None,                                    data_vec.get_i16());
+    /// assert_eq!(None,                                    data_vec.get_i32());
+    /// assert_eq!(Some(&LATITUDE_VAR_DATA[..]),            data_vec.get_f32());
+    /// assert_eq!(None,                                    data_vec.get_f64());
     /// ```
-    pub fn read_vars<T: AsRef<str>>(&mut self, var_names: &[T]) -> Result<(), IOError>
+    pub fn read_var(&mut self, var_name: &str) -> Result<DataVector, ReadError>
     {
-        // Check that all named variable exist and get rhe references
-        let not_defined_vars: Vec<String> = var_names.iter().filter(|var_name: &&T| {
-            !self.data_set.has_var(var_name.as_ref())
-        }).map(|var_name: &T|{
-            String::from(var_name.as_ref())
-        }).collect();
-        if !not_defined_vars.is_empty()
-        {
-            return Err(ReadDataError::VariablesNotDefined(not_defined_vars))?;
-        }
+        let (_var_index, _var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
+            ReadError::VariableNotDefined(String::from(var_name))
+        })?;
+        let data_vec: DataVector = self._read_var(var_name)?;
+        Ok(data_vec)
+    }
 
-        // Read bytes from the file
-        let num_bytes_per_record: usize = self.data_set.num_bytes_per_record();
-        let num_records: usize = self.data_set.num_records();
-        let ref mut input = self.input_file;
-        for var_name in var_names.into_iter() {
-            let (var_index, _ref_var): (usize, &Variable) = self.data_set.find_var_from_name(var_name.as_ref()).map_err(|_err: InvalidDataSet|{
-                ReadDataError::Unexpected
-            })?;
-            let var: &mut Variable = self.data_set.vars.get_mut(var_index).ok_or(ReadDataError::Unexpected)?;
-            let begin_offset: u64 = {
-                    let (_var_size, begin_offset): &(usize, Offset) = self.vars_info.get(var.name()).ok_or(ReadDataError::Unexpected)?;
-                    i64::from(begin_offset.clone()) as u64
-            };
-            let data_type: DataType = var.data_type();
-            let num_elements_per_chunk: usize = var.num_elements_per_chunk();
-            let num_bytes_zero_padding: usize = {
-                let num_bytes: usize = num_elements_per_chunk * data_type.size_of();
-                compute_num_bytes_zero_padding(num_bytes)
-            };
-            input.seek(SeekFrom::Start(begin_offset)).map_err(|err: std::io::Error|{
-                ReadDataError::Read(err.kind())
-            })?;
-            // memory allocation
-            let mut vec_data = DataVector::new(data_type, var.len());
-            if !var.is_record_var() {
-                match vec_data {
-                    DataVector::I8(ref mut data) => { input.read_i8_into(&mut data[..]) },
-                    DataVector::U8(ref mut data) => { input.read_exact(&mut data[..]) },
-                    DataVector::I16(ref mut data) => { input.read_i16_into::<BigEndian>(&mut data[..]) },
-                    DataVector::I32(ref mut data) => { input.read_i32_into::<BigEndian>(&mut data[..]) },
-                    DataVector::F32(ref mut data) => { input.read_f32_into::<BigEndian>(&mut data[..]) },
-                    DataVector::F64(ref mut data) => { input.read_f64_into::<BigEndian>(&mut data[..]) },
-                }.map_err(|err: std::io::Error| {
-                    ReadDataError::Read(err.kind())
-                })?;
-                if num_bytes_zero_padding > 0
-                {
-                    input.seek(SeekFrom::Current(num_bytes_zero_padding as i64)).map_err(|err: std::io::Error| {
-                        ReadDataError::Read(err.kind())
-                    })?;
-                }
-                var.data = Some(vec_data);
-            }
-            else {
-                let num_bytes_per_record: usize = num_bytes_per_record;
-                let chunk_size: usize = var.chunk_size();
-                let offset_size:i64 = (num_bytes_per_record + num_bytes_zero_padding - chunk_size) as i64;
-                for i in 0_usize..num_records
-                {
-                    // reader.seek(SeekFrom::)
-                    let start: usize = i * num_elements_per_chunk;
-                    let end: usize = (i + 1) * num_elements_per_chunk;
-                    match vec_data {
-                        DataVector::I8(ref mut data) => { input.read_i8_into(&mut data[start..end]) },
-                        DataVector::U8(ref mut data) => { input.read_exact(&mut data[start..end]) },
-                        DataVector::I16(ref mut data) => { input.read_i16_into::<BigEndian>(&mut data[start..end]) },
-                        DataVector::I32(ref mut data) => { input.read_i32_into::<BigEndian>(&mut data[start..end]) },
-                        DataVector::F32(ref mut data) => { input.read_f32_into::<BigEndian>(&mut data[start..end]) },
-                        DataVector::F64(ref mut data) => { input.read_f64_into::<BigEndian>(&mut data[start..end]) },
-                    }.map_err(|err: std::io::Error| {
-                        ReadDataError::Read(err.kind())
-                    })?;
-                    input.seek(SeekFrom::Current(offset_size)).map_err(|err: std::io::Error| {
-                        ReadDataError::Read(err.kind())
-                    })?;
-                }
-                var.data = Some(vec_data);
-            }
+    /// Read `i8` data from the file and returns them in a `Vec<i8>`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use netcdf3::{FileReader, DataSet, Variable, DataType};
+    ///
+    /// const TEMP_I8_VAR_NAME: &str = "temperature_i8";
+    /// const TEMP_I8_VAR_DATA: [i8; 30] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+    ///
+    /// // ...
+    /// # use copy_to_tmp_file::{
+    /// #     copy_bytes_to_tmp_file,
+    /// #     NC3_CLASSIC_FILE_NAME, NC3_CLASSIC_FILE_BYTES,
+    /// # };
+    /// #
+    /// # // Copy bytes to an temporary file
+    /// # let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
+    ///
+    /// // Read some variable data from the file
+    /// // -------------------------------------
+    /// let mut file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+    ///
+    /// assert_eq!(true,                                    file_reader.data_set().has_var(TEMP_I8_VAR_NAME));
+    /// assert_eq!(Some(DataType::I8),                      file_reader.data_set().var_data_type(TEMP_I8_VAR_NAME));
+    ///
+    /// let temperature: Vec<i8> = file_reader.read_var_to_i8(TEMP_I8_VAR_NAME).unwrap();
+    /// assert_eq!(TEMP_I8_VAR_DATA.to_vec(),              temperature);
+    /// ```
+    pub fn read_var_to_i8(&mut self, var_name: &str) -> Result<Vec<i8>, ReadError> {
+        let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
+            ReadError::VariableNotDefined(String::from(var_name))
+        })?;
+        if var.data_type != DataType::I8 {
+            return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: DataType::I8});
         }
-        return Ok(());
+        let data_vec: DataVector = self._read_var(var_name)?;
+        match data_vec {
+            DataVector::I8(data) => return Ok(data),
+            _ => return Err(ReadError::Unexpected),  // previously checked
+        }
+    }
+
+    /// Read `u8` data from the file and returns them in a `Vec<u8>`
+    ///
+    /// Also see the method [read_var_to_i8](struct.FileReader.html#method.read_var_to_i8).
+    pub fn read_var_to_u8(&mut self, var_name: &str) -> Result<Vec<u8>, ReadError> {
+        let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
+            ReadError::VariableNotDefined(String::from(var_name))
+        })?;
+        if var.data_type != DataType::U8 {
+            return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: DataType::U8});
+        }
+        let data_vec: DataVector = self._read_var(var_name)?;
+        match data_vec {
+            DataVector::U8(data) => return Ok(data),
+            _ => return Err(ReadError::Unexpected),  // previously checked
+        }
+    }
+
+    /// Read `i16` data from the file and returns them in a `Vec<i16>`
+    ///
+    /// Also see the method [read_var_to_i8](struct.FileReader.html#method.read_var_to_i8).
+    pub fn read_var_to_i16(&mut self, var_name: &str) -> Result<Vec<i16>, ReadError> {
+        let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
+            ReadError::VariableNotDefined(String::from(var_name))
+        })?;
+        if var.data_type != DataType::I16 {
+            return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: DataType::I16});
+        }
+        let data_vec: DataVector = self._read_var(var_name)?;
+        match data_vec {
+            DataVector::I16(data) => return Ok(data),
+            _ => return Err(ReadError::Unexpected),  // previously checked
+        }
+    }
+
+    /// Read `i32` data from the file and returns them in a `Vec<i32>`
+    ///
+    /// Also see the method [read_var_to_i8](struct.FileReader.html#method.read_var_to_i8).
+    pub fn read_var_to_i32(&mut self, var_name: &str) -> Result<Vec<i32>, ReadError> {
+        let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
+            ReadError::VariableNotDefined(String::from(var_name))
+        })?;
+        if var.data_type != DataType::I32 {
+            return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: DataType::I32});
+        }
+        let data_vec: DataVector = self._read_var(var_name)?;
+        match data_vec {
+            DataVector::I32(data) => return Ok(data),
+            _ => return Err(ReadError::Unexpected),  // previously checked
+        }
+    }
+
+    /// Read `f32` data from the file and returns them in a `Vec<f32>`
+    ///
+    /// Also see the method [read_var_to_i8](struct.FileReader.html#method.read_var_to_i8).
+    pub fn read_var_to_f32(&mut self, var_name: &str) -> Result<Vec<f32>, ReadError> {
+        let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
+            ReadError::VariableNotDefined(String::from(var_name))
+        })?;
+        if var.data_type != DataType::F32 {
+            return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: DataType::F32});
+        }
+        let data_vec: DataVector = self._read_var(var_name)?;
+        match data_vec {
+            DataVector::F32(data) => return Ok(data),
+            _ => return Err(ReadError::Unexpected),  // previously checked
+        }
+    }
+
+    /// Read `f64` data from the file and returns them in a `Vec<f64>`
+    ///
+    /// Also see the method [read_var_to_i8](struct.FileReader.html#method.read_var_to_i8).
+    pub fn read_var_to_f64(&mut self, var_name: &str) -> Result<Vec<f64>, ReadError> {
+        let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
+            ReadError::VariableNotDefined(String::from(var_name))
+        })?;
+        if var.data_type != DataType::F64 {
+            return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: DataType::F64});
+        }
+        let data_vec: DataVector = self._read_var(var_name)?;
+        match data_vec {
+            DataVector::F64(data) => return Ok(data),
+            _ => return Err(ReadError::Unexpected),  // previously checked
+        }
     }
 
     /// Reads one variable from the file and stored it into the data set.
     ///
     /// See the method [read_vars](struct.FileReader.html#method.read_vars).
-    pub fn read_var(&mut self, var_name: &str) -> Result<(), IOError>
+    fn _read_var(&mut self, var_name: &str) -> Result<DataVector, ReadError>
     {
-        self.read_vars(&[var_name])
+        let ref mut input = self.input_file;
+        let (_, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
+            ReadError::VariableNotDefined(String::from(var_name))
+        })?;
+        let record_size: usize = self.data_set.record_size().unwrap_or(0);
+        let num_records: usize = self.data_set.num_records().unwrap_or(0);
+        let begin_offset: u64 = {
+                let (_var_size, begin_offset): &(usize, Offset) = self.vars_info.get(var.name()).ok_or(ReadError::Unexpected)?;
+                i64::from(begin_offset.clone()) as u64
+        };
+        let data_type: DataType = var.data_type();
+        let chunk_len: usize = var.chunk_len();
+        let padding_size: usize = {
+            let num_bytes: usize = chunk_len * data_type.size_of();
+            compute_padding_size(num_bytes)
+        };
+        input.seek(SeekFrom::Start(begin_offset))?;
+        // memory allocation
+        let mut data_vec = DataVector::new(data_type, var.len());
+        if !var.is_record_var() {
+            match data_vec {
+                DataVector::I8(ref mut data) => { input.read_i8_into(&mut data[..]) },
+                DataVector::U8(ref mut data) => { input.read_exact(&mut data[..]) },
+                DataVector::I16(ref mut data) => { input.read_i16_into::<BigEndian>(&mut data[..]) },
+                DataVector::I32(ref mut data) => { input.read_i32_into::<BigEndian>(&mut data[..]) },
+                DataVector::F32(ref mut data) => { input.read_f32_into::<BigEndian>(&mut data[..]) },
+                DataVector::F64(ref mut data) => { input.read_f64_into::<BigEndian>(&mut data[..]) },
+            }?;
+            if padding_size > 0
+            {
+                input.seek(SeekFrom::Current(padding_size as i64))?;
+            }
+        }
+        else {
+            let chunk_size: usize = var.chunk_size();
+
+            let offset_size: i64 = (record_size + padding_size - chunk_size) as i64;
+            for i in 0_usize..num_records
+            {
+                // reader.seek(SeekFrom::)
+                let start: usize = i * chunk_len;
+                let end: usize = (i + 1) * chunk_len;
+                match data_vec {
+                    DataVector::I8(ref mut data) => { input.read_i8_into(&mut data[start..end]) },
+                    DataVector::U8(ref mut data) => { input.read_exact(&mut data[start..end]) },
+                    DataVector::I16(ref mut data) => { input.read_i16_into::<BigEndian>(&mut data[start..end]) },
+                    DataVector::I32(ref mut data) => { input.read_i32_into::<BigEndian>(&mut data[start..end]) },
+                    DataVector::F32(ref mut data) => { input.read_f32_into::<BigEndian>(&mut data[start..end]) },
+                    DataVector::F64(ref mut data) => { input.read_f64_into::<BigEndian>(&mut data[start..end]) },
+                }?;
+                input.seek(SeekFrom::Current(offset_size))?;
+            }
+        }
+        Ok(data_vec)
     }
 
     /// Parses the NetCDF-3 header
-    fn parse_header(input: &[u8]) -> Result<(DataSet, Version, Vec<(String, (usize, Offset))>), IOError> {
+    fn parse_header(input: &[u8]) -> Result<(DataSet, Version, Vec<(String, (usize, Offset))>), ReadError> {
         // the magic word
         let (input, _): (&[u8], &[u8]) = FileReader::parse_magic_word(input).unwrap();
         // the version number
@@ -419,7 +539,7 @@ impl FileReader {
         let mut vars_info: Vec<(String, (usize, Offset))> = vec![];
         // Append the variables
         for (var_name, var_dim_ids, var_attrs_list, var_data_type, var_size, begin_offset) in vars_list.into_iter() {
-            let var_dim_refs: Vec<Rc<Dimension>> = data_set.get_dims_from_ids(&var_dim_ids)?;
+            let var_dim_refs: Vec<Rc<Dimension>> = data_set.get_dims_from_dim_ids(&var_dim_ids)?;
             // Append the variable
             data_set.add_var_using_dim_refs(&var_name, var_dim_refs, var_data_type)?;
             // Save the size and the begin offset of the variable
@@ -456,11 +576,10 @@ impl FileReader {
         Ok((data_set, version, vars_info))
     }
 
-
     fn parse_magic_word(input: &[u8]) -> Result<(&[u8], &[u8]), ParseHeaderError>
     {
         let (input, tag_value): (&[u8], &[u8]) = tag(&b"CDF"[..])(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseErrorKind::MagicWord)
+            ParseHeaderError::new(err, ParseHeaderErrorKind::MagicWord)
         })?;
         Ok((input, tag_value))
     }
@@ -470,7 +589,7 @@ impl FileReader {
         let (input, version_number): (&[u8], u8) = verify(be_u8, |ver_num: &u8|{
             ver_num == &(Version::Classic as u8) || ver_num == &(Version::Offset64Bit as u8)
         })(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseErrorKind::VersionNumber)
+            ParseHeaderError::new(err, ParseHeaderErrorKind::VersionNumber)
         })?;
         let version = Version::try_from(version_number).unwrap();  // previously checked
         Ok((input, version))
@@ -479,7 +598,7 @@ impl FileReader {
     /// Parses a `i32` word and checks that it is non-negative.
     fn parse_non_neg_i32(input: &[u8]) -> Result<(&[u8], i32), ParseHeaderError> {
         verify(be_i32, |number: &i32| *number >= 0_i32)(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseErrorKind::NonNegativeI32)
+            ParseHeaderError::new(err, ParseHeaderErrorKind::NonNegativeI32)
         })
     }
 
@@ -501,10 +620,10 @@ impl FileReader {
         let (input, name): (&[u8], String) = map_res(take(num_of_bytes), |bytes: &[u8]| {
             String::from_utf8(bytes.to_vec())
         })(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseErrorKind::Utf8)
+            ParseHeaderError::new(err, ParseHeaderErrorKind::Utf8)
         })?;
         // Take the zero padding bytes if necessary
-        let (input, _zero_padding_bytes): (&[u8], &[u8]) = FileReader::parse_zero_padding(input, compute_num_bytes_zero_padding(num_of_bytes))?;
+        let (input, _zero_padding_bytes): (&[u8], &[u8]) = FileReader::parse_zero_padding(input, compute_padding_size(num_of_bytes))?;
         Ok((input, name))
     }
 
@@ -516,7 +635,7 @@ impl FileReader {
         let data_type: DataType = DataType::try_from(data_type_number).map_err(|_err|{
             nom::Err::Error((&start[0..4], nom::error::ErrorKind::Verify))
         }).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseErrorKind::DataType)
+            ParseHeaderError::new(err, ParseHeaderErrorKind::DataType)
         })?;
         Ok((input, data_type))
     }
@@ -532,12 +651,12 @@ impl FileReader {
             DataType::F32 => many_m_n(num_of_elements, num_of_elements, be_f32)(&input).map(|(input, data): (&[u8], Vec<f32>)| (input, DataVector::F32(data))),
             DataType::F64 => many_m_n(num_of_elements, num_of_elements, be_f64)(&input).map(|(input, data): (&[u8], Vec<f64>)| (input, DataVector::F64(data))),
         }.map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseErrorKind::DataElements)
+            ParseHeaderError::new(err, ParseHeaderErrorKind::DataElements)
         })?;
 
         // Parse the zero padding bytes if necessary
         let num_of_bytes: usize = data_type.size_of() * num_of_elements;
-        let (input, _zero_padding_bytes): (&[u8], &[u8]) = FileReader::parse_zero_padding(input, compute_num_bytes_zero_padding(num_of_bytes))?;
+        let (input, _zero_padding_bytes): (&[u8], &[u8]) = FileReader::parse_zero_padding(input, compute_padding_size(num_of_bytes))?;
         Ok((input, data_vector))
     }
 
@@ -548,7 +667,7 @@ impl FileReader {
                 *byte == 0_u8
             })
         })(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseErrorKind::ZeroPadding)
+            ParseHeaderError::new(err, ParseHeaderErrorKind::ZeroPadding)
         })
     }
 
@@ -562,7 +681,7 @@ impl FileReader {
             Ok((input, (dim_name, dim_size)))
         }
         let (input, dim_tag): (&[u8], &[u8]) = alt((tag(ABSENT_TAG), tag(DIMENSION_TAG)))(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseErrorKind::DimTag)
+            ParseHeaderError::new(err, ParseHeaderErrorKind::DimTag)
         })?;
         if dim_tag == &ABSENT_TAG {
             return Ok((input, vec![]));
@@ -590,7 +709,7 @@ impl FileReader {
             Ok((input, (attr_name, attr_data)))
         }
         let (input, attr_tag): (&[u8], &[u8]) = alt((tag(ABSENT_TAG), tag(ATTRIBUTE_TAG)))(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseErrorKind::AttrTag)
+            ParseHeaderError::new(err, ParseHeaderErrorKind::AttrTag)
         })?;
         if attr_tag == &ABSENT_TAG {
             return Ok((input, vec![]));
@@ -605,8 +724,6 @@ impl FileReader {
         }
         Ok((input, attrs_list))
     }
-
-
 
     // Parses a list of variables from the header.
     fn parse_vars_list(input: &[u8], version: Version) -> Result<(&[u8], Vec<(String, Vec<usize>, Vec<(String, DataVector)>, DataType, usize, Offset)>), ParseHeaderError>
@@ -639,7 +756,7 @@ impl FileReader {
                     })
                 },
             }.map_err(|err: NomError| {
-                ParseHeaderError::new(err, ParseErrorKind::Offset)
+                ParseHeaderError::new(err, ParseHeaderErrorKind::Offset)
             })
         }
 
@@ -661,7 +778,7 @@ impl FileReader {
             return Ok((input, (var_name, dim_ids_list, var_attrs_list, var_data_type, var_size, begin_offset)));
         }
         let (input, var_tag): (&[u8], &[u8]) = alt((tag(ABSENT_TAG), tag(VARIABLE_TAG)))(input).map_err(|err: NomError| {
-            ParseHeaderError::new(err, ParseErrorKind::VarTag)
+            ParseHeaderError::new(err, ParseHeaderErrorKind::VarTag)
         })?;
         if var_tag == &ABSENT_TAG {
             return Ok((input, vec![]));

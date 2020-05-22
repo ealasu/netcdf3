@@ -358,27 +358,74 @@ impl Attribute {
         self.data.get_i8()
     }
 
-    /// Returns a reference of the `u8` data or `None` of the attribute has not `u8` data (refer to the method [get_i8](struct.Attribute.html#method.get_i8)).
+    /// Returns a reference of the `u8` data or `None` if the attribute has not `u8` data (also see the method [get_i8](struct.Attribute.html#method.get_i8)).
     pub fn get_u8(&self) -> Option<&[u8]> {
         self.data.get_u8()
     }
 
-    /// Returns a reference of the `i16` data or `None` of the attribute has not `i16` data (refer to the method [get_i8](struct.Attribute.html#method.get_i8)).
+    /// Returns the attribute data as a `String`.
+    ///
+    /// Returns `None` if the attribute is not a `u8` attribute, or of this `u8` attribute does not contain valid UTF-8 encoded bytes
+    /// (also see the method [get_i8](struct.Attribute.html#method.get_u8)).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use netcdf3::{DataSet, Attribute, DataType};
+    ///
+    /// const UTF8_ATTR_NAME: &str = "utf8_attr";
+    /// const LATIN1_ATTR_NAME: &str = "latin1_attr";
+    ///
+    /// let data_set: DataSet = {
+    ///     let mut data_set: DataSet = DataSet::new();
+    ///
+    ///     let utf8_bytes: Vec<u8> = "café".as_bytes().to_vec();           // utf-8 encoding
+    ///     data_set.add_global_attr_u8(UTF8_ATTR_NAME, utf8_bytes).unwrap();
+    ///
+    ///     let latin1_bytes: Vec<u8> = vec![b'c', b'a', b'f', b'\xe9'];    // latin-1 encoding
+    ///     data_set.add_global_attr_u8(LATIN1_ATTR_NAME, latin1_bytes).unwrap();
+    ///
+    ///     data_set
+    /// };
+    ///
+    /// assert_eq!(2,       data_set.num_global_attrs());
+    /// assert_eq!(true,    data_set.has_global_attr(UTF8_ATTR_NAME));
+    /// {
+    ///     let attr: &Attribute = data_set.get_global_attr(UTF8_ATTR_NAME).unwrap();
+    ///     assert_eq!(DataType::U8,                                        attr.data_type());
+    ///     assert_eq!(Some(&[b'c', b'a', b'f', 0xc3, 0xa9][..]),           attr.get_u8());
+    ///     assert_eq!(Some(String::from("café")),                          attr.get_as_string());
+    /// }
+    /// assert_eq!(true,    data_set.has_global_attr(LATIN1_ATTR_NAME));
+    /// {
+    ///     let attr: &Attribute = data_set.get_global_attr(LATIN1_ATTR_NAME).unwrap();
+    ///     assert_eq!(DataType::U8,                                        attr.data_type());
+    ///     assert_eq!(Some(&[b'c', b'a', b'f', b'\xe9'][..]),              attr.get_u8());
+    ///     assert_eq!(None,                                                attr.get_as_string());
+    /// }
+    ///
+    ///
+    /// ```
+    pub fn get_as_string(&self) -> Option<String> {
+        self.data.get_as_string()
+    }
+
+    /// Returns a reference of the `i16` data or `None` if the attribute has not `i16` data (also see the method [get_i8](struct.Attribute.html#method.get_i8)).
     pub fn get_i16(&self) -> Option<&[i16]> {
         self.data.get_i16()
     }
 
-    /// Returns a reference of the `i32` data or `None` of the attribute has not `i32` data (refer to the method [get_i8](struct.Attribute.html#method.get_i8)).
+    /// Returns a reference of the `i32` data or `None` if the attribute has not `i32` data (also see the method [get_i8](struct.Attribute.html#method.get_i8)).
     pub fn get_i32(&self) -> Option<&[i32]> {
         self.data.get_i32()
     }
 
-    /// Returns a reference of the `f32` data or `None` of the attribute has not `f32` data (refer to the method [get_i8](struct.Attribute.html#method.get_i8)).
+    /// Returns a reference of the `f32` data or `None` if the attribute has not `f32` data (also see the method [get_i8](struct.Attribute.html#method.get_i8)).
     pub fn get_f32(&self) -> Option<&[f32]> {
         self.data.get_f32()
     }
 
-    /// Returns a reference of the `f64` data or `None` of the attribute has not `f64` data (refer to the method [get_i8](struct.Attribute.html#method.get_i8)).
+    /// Returns a reference of the `f64` data or `None` if the attribute has not `f64` data (also see the method [get_i8](struct.Attribute.html#method.get_i8)).
     pub fn get_f64(&self) -> Option<&[f64]> {
         self.data.get_f64()
     }

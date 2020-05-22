@@ -1,6 +1,5 @@
 #[repr(u8)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-
 /// NetCDF-3 file versions (classic or 64-bit offset)
 pub enum Version {
     /// Classic format (use `i32` for the begin offsets)

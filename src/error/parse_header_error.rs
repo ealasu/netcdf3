@@ -6,13 +6,13 @@ pub(crate) type NomError<'a> = nom::Err<(&'a[u8], NomErrorKind)>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseHeaderError {
-    pub kind: ParseErrorKind,
+    pub kind: ParseHeaderErrorKind,
     pub invalid_bytes: InvalidBytes,
 }
 
 impl ParseHeaderError {
 
-    pub(crate) fn new<'a>(err: NomError<'a>, kind: ParseErrorKind) -> Self {
+    pub(crate) fn new<'a>(err: NomError<'a>, kind: ParseHeaderErrorKind) -> Self {
         Self {
             kind: kind,
             invalid_bytes: InvalidBytes::from(err),
@@ -45,25 +45,18 @@ impl<'a> std::convert::From<NomError<'a>> for InvalidBytes {
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParseErrorKind {
+pub enum ParseHeaderErrorKind {
     MagicWord,
     VersionNumber,
     NonNegativeI32,
-    NameString,
+    // NameString,
     ZeroPadding,
     DimTag,
-    DimId,
+    // DimId,
     AttrTag,
     VarTag,
     DataType,
     DataElements,
     Utf8,
     Offset,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ReadDataError {
-    Unexpected,
-    VariablesNotDefined(Vec<String>),
-    Read(std::io::ErrorKind),
 }

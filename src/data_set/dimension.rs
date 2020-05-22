@@ -1,5 +1,5 @@
 use crate::InvalidDataSet;
-
+use crate::NC_MAX_DIM_SIZE;
 use crate::name_string::is_valid_name;
 
 use std::cell::RefCell;
@@ -34,11 +34,11 @@ use std::cell::RefCell;
 /// assert_eq!(2,                                   data_set.num_dims());
 /// assert_eq!(true,                                data_set.has_unlimited_dim());
 /// assert_eq!(true,                                data_set.has_dim(DIM_NAME_1));
-/// assert_eq!(Some(DIM_SIZE_1),                    data_set.get_dim_size(DIM_NAME_1));
-/// assert_eq!(Some(DimensionType::UnlimitedSize),  data_set.get_dim_type(DIM_NAME_1));
+/// assert_eq!(Some(DIM_SIZE_1),                    data_set.dim_size(DIM_NAME_1));
+/// assert_eq!(Some(DimensionType::UnlimitedSize),  data_set.dim_type(DIM_NAME_1));
 /// assert_eq!(true,                                data_set.has_dim(DIM_NAME_2));
-/// assert_eq!(Some(DIM_SIZE_2),                    data_set.get_dim_size(DIM_NAME_2));
-/// assert_eq!(Some(DimensionType::FixedSize),      data_set.get_dim_type(DIM_NAME_2));
+/// assert_eq!(Some(DIM_SIZE_2),                    data_set.dim_size(DIM_NAME_2));
+/// assert_eq!(Some(DimensionType::FixedSize),      data_set.dim_type(DIM_NAME_2));
 ///
 /// // Or through references of the dimensions
 /// let dim_1: Rc<Dimension> = data_set.get_dim(DIM_NAME_1).unwrap();
@@ -75,11 +75,11 @@ use std::cell::RefCell;
 /// assert_eq!(1,                               data_set.num_dims());
 /// assert_eq!(false,                           data_set.has_unlimited_dim());
 /// assert_eq!(true,                            data_set.has_dim(DIM_NAME_1));
-/// assert_eq!(Some(DIM_SIZE),                  data_set.get_dim_size(DIM_NAME_1));
-/// assert_eq!(Some(DimensionType::FixedSize),  data_set.get_dim_type(DIM_NAME_1));
+/// assert_eq!(Some(DIM_SIZE),                  data_set.dim_size(DIM_NAME_1));
+/// assert_eq!(Some(DimensionType::FixedSize),  data_set.dim_type(DIM_NAME_1));
 /// assert_eq!(false,                           data_set.has_dim(DIM_NAME_2));
-/// assert_eq!(None,                            data_set.get_dim_size(DIM_NAME_2));
-/// assert_eq!(None,                            data_set.get_dim_type(DIM_NAME_2));
+/// assert_eq!(None,                            data_set.dim_size(DIM_NAME_2));
+/// assert_eq!(None,                            data_set.dim_type(DIM_NAME_2));
 ///
 /// // Rename the *fixed-size* dimension
 /// data_set.rename_dim(DIM_NAME_1, DIM_NAME_2).unwrap();
@@ -87,11 +87,11 @@ use std::cell::RefCell;
 /// assert_eq!(1,                               data_set.num_dims());
 /// assert_eq!(false,                           data_set.has_unlimited_dim());
 /// assert_eq!(false,                           data_set.has_dim(DIM_NAME_1));
-/// assert_eq!(None,                            data_set.get_dim_size(DIM_NAME_1));
-/// assert_eq!(None,                            data_set.get_dim_type(DIM_NAME_1));
+/// assert_eq!(None,                            data_set.dim_size(DIM_NAME_1));
+/// assert_eq!(None,                            data_set.dim_type(DIM_NAME_1));
 /// assert_eq!(true,                            data_set.has_dim(DIM_NAME_2));
-/// assert_eq!(Some(DIM_SIZE),                  data_set.get_dim_size(DIM_NAME_2));
-/// assert_eq!(Some(DimensionType::FixedSize),  data_set.get_dim_type(DIM_NAME_2));
+/// assert_eq!(Some(DIM_SIZE),                  data_set.dim_size(DIM_NAME_2));
+/// assert_eq!(Some(DimensionType::FixedSize),  data_set.dim_type(DIM_NAME_2));
 /// ```
 ///
 /// ## Remove a dimension
@@ -112,8 +112,8 @@ use std::cell::RefCell;
 /// assert_eq!(1,                                   data_set.num_dims());
 /// assert_eq!(true,                                data_set.has_unlimited_dim());
 /// assert_eq!(true,                                data_set.has_dim(DIM_NAME));
-/// assert_eq!(Some(DIM_SIZE),                      data_set.get_dim_size(DIM_NAME));
-/// assert_eq!(Some(DimensionType::UnlimitedSize),  data_set.get_dim_type(DIM_NAME));
+/// assert_eq!(Some(DIM_SIZE),                      data_set.dim_size(DIM_NAME));
+/// assert_eq!(Some(DimensionType::UnlimitedSize),  data_set.dim_type(DIM_NAME));
 ///
 /// // Remove the *unlimited-size* dimension
 /// let _removed_dim: Rc<Dimension> = data_set.remove_dim(DIM_NAME).unwrap();
@@ -121,18 +121,18 @@ use std::cell::RefCell;
 /// assert_eq!(0,       data_set.num_dims());
 /// assert_eq!(false,   data_set.has_unlimited_dim());
 /// assert_eq!(false,   data_set.has_dim(DIM_NAME));
-/// assert_eq!(None,    data_set.get_dim_size(DIM_NAME));
-/// assert_eq!(None,    data_set.get_dim_type(DIM_NAME));
+/// assert_eq!(None,    data_set.dim_size(DIM_NAME));
+/// assert_eq!(None,    data_set.dim_type(DIM_NAME));
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Dimension {
-    pub(in crate::data_set) name: RefCell<String>,
-    pub(in crate::data_set) size: DimensionSize,
+    pub(crate) name: RefCell<String>,
+    pub(crate) size: DimensionSize,
 }
 
 /// Internal representation of the size of a dimension.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(in crate::data_set) enum DimensionSize {
+pub(crate) enum DimensionSize {
     /// *Unlimited-size* dimension, the unlimited size can be modifed by the NetCDF-3 dataset.
     Unlimited(RefCell<usize>),
     /// *Fixed-size* dimension
@@ -178,8 +178,14 @@ impl DimensionSize {
 impl Dimension {
 
     /// Creates a new *fixed size* NetCDF-3 dimension.
-    pub(in crate::data_set) fn new_fixed_size(name: &str, size: usize) -> Result<Dimension, InvalidDataSet> {
+    pub(crate) fn new_fixed_size(name: &str, size: usize) -> Result<Dimension, InvalidDataSet> {
         Dimension::check_dim_name(name)?;
+        if size == 0 {
+            return Err(InvalidDataSet::FixedDimensionWithZeroSize(name.to_string()));
+        }
+        if size > NC_MAX_DIM_SIZE {
+            return Err(InvalidDataSet::MaximumFixedDimensionSizeExceeded{dim_name: name.to_string(), get: size});
+        }
         return Ok(Dimension {
             name: RefCell::new(name.to_string()),
             size: DimensionSize::new(size, DimensionType::FixedSize),
@@ -187,7 +193,7 @@ impl Dimension {
     }
 
     /// Creates a new *unlimited size* NetCDF-3 dimension.
-    pub(in crate::data_set) fn new_unlimited_size(name: &str, size: usize) -> Result<Dimension, InvalidDataSet> {
+    pub(crate) fn new_unlimited_size(name: &str, size: usize) -> Result<Dimension, InvalidDataSet> {
         Dimension::check_dim_name(name)?;
         return Ok(Dimension {
             name: RefCell::new(name.to_string()),
@@ -318,7 +324,7 @@ mod tests {
 
     #[test]
     fn test_rc_dim_equality() {
-        // test equality between 2 fixed-size dimension
+        // test equality between 2 fixed-size dimensions
         {
             let dim_a: Rc<Dimension> = Rc::new(Dimension::new_fixed_size("name_1", 180).unwrap());
             let dim_b: Rc<Dimension> = Rc::new(Dimension::new_fixed_size("name_1", 180).unwrap());

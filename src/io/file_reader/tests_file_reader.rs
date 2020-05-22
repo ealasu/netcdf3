@@ -2,293 +2,307 @@
 
 use byteorder::{WriteBytesExt, BigEndian};
 
+use crate::{
+    FileReader, DataSet, DataType,
+    error::ReadError,
+    error::parse_header_error::{ParseHeaderError, ParseHeaderErrorKind, InvalidBytes},
+    io::compute_padding_size,
+};
+
 use copy_to_tmp_file::{
     copy_bytes_to_tmp_file,
     NC3_CLASSIC_FILE_NAME, NC3_CLASSIC_FILE_BYTES,
 };
 
-use crate::{
-    FileReader,
-    DataSet, Variable, DataType, Version,
-    error::{
-        IOError,
-        input_error::{ReadDataError, ParseHeaderError, InvalidBytes, ParseErrorKind},
-    },
-    io::compute_num_bytes_zero_padding,
-};
+const TEMP_I8_VAR_NAME: &str = "temperature_i8";
+const TEMP_I8_VAR_DATA: [i8; 30] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+
+const TEMP_U8_VAR_NAME: &str = "temperature_u8";
+const TEMP_U8_VAR_DATA: [u8; 30] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+
+const TEMP_I16_VAR_NAME: &str = "temperature_i16";
+const TEMP_I16_VAR_DATA: [i16; 30] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+
+const TEMP_I32_VAR_NAME: &str = "temperature_i32";
+const TEMP_I32_VAR_DATA: [i32; 30] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+
+const TEMP_F32_VAR_NAME: &str = "temperature_f32";
+const TEMP_F32_VAR_DATA: [f32; 30] = [0., 1., 2., 3., 4., 5., 6., 7., 8., 9., 10., 11., 12., 13., 14., 15., 16., 17., 18., 19., 20., 21., 22., 23., 24., 25., 26., 27., 28., 29.];
+
+const TEMP_F64_VAR_NAME: &str = "temperature_f64";
+const TEMP_F64_VAR_DATA: [f64; 30] = [0., 1., 2., 3., 4., 5., 6., 7., 8., 9., 10., 11., 12., 13., 14., 15., 16., 17., 18., 19., 20., 21., 22., 23., 24., 25., 26., 27., 28., 29.];
 
 
 #[test]
-fn test_file_reader_open()
-{
-    // Copy bytes to a temporary file
+fn test_file_reader_read_var_to_i8() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
-    // Read the data set
-    let data_set: DataSet = {
-        let file_reader = FileReader::open(input_data_file_path).unwrap();
-        assert_eq!(Version::Classic, file_reader.version());
-        file_reader.close().0
-    };
+    let mut file_reader = FileReader::open(input_data_file_path).unwrap();
+
+    {
+        let data_set: &DataSet = file_reader.data_set();
+        assert_eq!(true,                            data_set.has_var(TEMP_I8_VAR_NAME));
+        assert_eq!(Some(DataType::I8),              data_set.var_data_type(TEMP_I8_VAR_NAME));
+    }
+
+    assert_eq!(Ok(TEMP_I8_VAR_DATA.to_vec()), file_reader.read_var_to_i8(TEMP_I8_VAR_NAME));
+
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::I8},
+        file_reader.read_var_to_i8(TEMP_U8_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::I8},
+        file_reader.read_var_to_i8(TEMP_I16_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::I8},
+        file_reader.read_var_to_i8(TEMP_I32_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::I8},
+        file_reader.read_var_to_i8(TEMP_F32_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::I8},
+        file_reader.read_var_to_i8(TEMP_F64_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableNotDefined(String::from("undef_var")),
+        file_reader.read_var_to_u8("undef_var").unwrap_err()
+    );
+
+    let data_set: DataSet = file_reader.close().0;
     tmp_dir.close().unwrap();
 
-    // Check the parsing of the header
-    assert!(data_set.has_unlimited_dim());
-    assert_eq!(3, data_set.num_dims());
-    assert_eq!(1, data_set.num_global_attrs());
-    assert_eq!(9, data_set.num_vars());
-
-    // Check no variable data have not been load from the file, only metadata stored in the header have been loaded previousl
-    // latitude
-    {
-        assert!(data_set.has_var("latitude"));
-        let var: &Variable = data_set.get_var("latitude").unwrap();
-        assert_eq!(DataType::F32, var.data_type());
-        assert!(var.get_f32().is_none()); // only metadata stored in the header have been loaded previously
-    }
-    // longitude
-    {
-        assert!(data_set.has_var("longitude"));
-        let var: &Variable = data_set.get_var("longitude").unwrap();
-        assert_eq!(DataType::F32, var.data_type());
-        assert!(var.get_f32().is_none()); // only metadata stored in the header have been loaded previously
-    }
-    // time
-    {
-        assert!(data_set.has_var("time"));
-        let var: &Variable = data_set.get_var("time").unwrap();
-        assert_eq!(DataType::F32, var.data_type());
-        assert!(var.get_f32().is_none()); // only metadata stored in the header have been loaded previously
-    }
-    // temperature_i8
-    {
-        assert!(data_set.has_var("temperature_i8"));
-        let var: &Variable = data_set.get_var("temperature_i8").unwrap();
-        assert_eq!(DataType::I8, var.data_type());
-        assert!(var.get_i8().is_none()); // only metadata stored in the header have been loaded previously
-    }
-    // temperature_u8
-    {
-        assert!(data_set.has_var("temperature_u8"));
-        let var: &Variable = data_set.get_var("temperature_u8").unwrap();
-        assert_eq!(DataType::U8, var.data_type());
-        assert!(var.get_u8().is_none()); // only metadata stored in the header have been loaded previously
-    }
-    // temperature_i16
-    {
-        assert!(data_set.has_var("temperature_i16"));
-        let var: &Variable = data_set.get_var("temperature_i16").unwrap();
-        assert_eq!(DataType::I16, var.data_type());
-        assert!(var.get_i16().is_none()); // only metadata stored in the header have been loaded previously
-    }
-    // temperature_i32
-    {
-        assert!(data_set.has_var("temperature_i32"));
-        let var: &Variable = data_set.get_var("temperature_i32").unwrap();
-        assert_eq!(DataType::I32, var.data_type());
-        assert!(var.get_i32().is_none()); // only metadata stored in the header have been loaded previously
-    }
-    // temperature_f32
-    {
-        assert!(data_set.has_var("temperature_f32"));
-        let var: &Variable = data_set.get_var("temperature_f32").unwrap();
-        assert_eq!(DataType::F32, var.data_type());
-        assert!(var.get_f32().is_none()); // only metadata stored in the header have been loaded previously
-    }
-    // temperature_f64
-    {
-        assert!(data_set.has_var("temperature_f64"));
-        let var: &Variable = data_set.get_var("temperature_f64").unwrap();
-        assert_eq!(DataType::F64, var.data_type());
-        assert!(var.get_f64().is_none()); // only metadata stored in the header have been loaded previously
-    }
+    assert_eq!(true,                            data_set.has_var(TEMP_U8_VAR_NAME));
+    assert_eq!(Some(DataType::U8),              data_set.var_data_type(TEMP_U8_VAR_NAME));
 }
 
 #[test]
-fn test_file_reader_read_all_vars()
-{
-    // Copy bytes to a temporary file
+fn test_file_reader_read_var_to_u8() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
-    // Read the data set
-    let data_set: DataSet = {
-        let mut file_reader = FileReader::open(input_data_file_path).unwrap();
-        file_reader.read_all_vars().unwrap();
-        file_reader.close().0
-    };
+    let mut file_reader = FileReader::open(input_data_file_path).unwrap();
+
+    {
+        let data_set: &DataSet = file_reader.data_set();
+        assert_eq!(true,                            data_set.has_var(TEMP_U8_VAR_NAME));
+        assert_eq!(Some(DataType::U8),              data_set.var_data_type(TEMP_U8_VAR_NAME));
+    }
+
+    assert_eq!(Ok(TEMP_U8_VAR_DATA.to_vec()), file_reader.read_var_to_u8(TEMP_U8_VAR_NAME));
+
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::U8},
+        file_reader.read_var_to_u8(TEMP_I8_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::U8},
+        file_reader.read_var_to_u8(TEMP_I16_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::U8},
+        file_reader.read_var_to_u8(TEMP_I32_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::U8},
+        file_reader.read_var_to_u8(TEMP_F32_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::U8},
+        file_reader.read_var_to_u8(TEMP_F64_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableNotDefined(String::from("undef_var")),
+        file_reader.read_var_to_u8("undef_var").unwrap_err()
+    );
+
+    let data_set: DataSet = file_reader.close().0;
     tmp_dir.close().unwrap();
 
-    // Check all variable data have been loaded from the file
-    // latitude
-    {
-        assert!(data_set.has_var("latitude"));
-        let var: &Variable = data_set.get_var("latitude").unwrap();
-        assert_eq!(DataType::F32, var.data_type());
-        assert!(var.get_f32().is_some());
-    }
-    // longitude
-    {
-        assert!(data_set.has_var("longitude"));
-        let var: &Variable = data_set.get_var("longitude").unwrap();
-        assert_eq!(DataType::F32, var.data_type());
-        assert!(var.get_f32().is_some());
-    }
-    // time
-    {
-        assert!(data_set.has_var("time"));
-        let var: &Variable = data_set.get_var("time").unwrap();
-        assert_eq!(DataType::F32, var.data_type());
-        assert!(var.get_f32().is_some());
-    }
-    // temperature_i8
-    {
-        assert!(data_set.has_var("temperature_i8"));
-        let var: &Variable = data_set.get_var("temperature_i8").unwrap();
-        assert_eq!(DataType::I8, var.data_type());
-        assert!(var.get_i8().is_some());
-    }
-    // temperature_u8
-    {
-        assert!(data_set.has_var("temperature_u8"));
-        let var: &Variable = data_set.get_var("temperature_u8").unwrap();
-        assert_eq!(DataType::U8, var.data_type());
-        assert!(var.get_u8().is_some());
-    }
-    // temperature_i16
-    {
-        assert!(data_set.has_var("temperature_i16"));
-        let var: &Variable = data_set.get_var("temperature_i16").unwrap();
-        assert_eq!(DataType::I16, var.data_type());
-        assert!(var.get_i16().is_some());
-    }
-    // temperature_i32
-    {
-        assert!(data_set.has_var("temperature_i32"));
-        let var: &Variable = data_set.get_var("temperature_i32").unwrap();
-        assert_eq!(DataType::I32, var.data_type());
-        assert!(var.get_i32().is_some());
-    }
-    // temperature_f32
-    {
-        assert!(data_set.has_var("temperature_f32"));
-        let var: &Variable = data_set.get_var("temperature_f32").unwrap();
-        assert_eq!(DataType::F32, var.data_type());
-        assert!(var.get_f32().is_some());
-    }
-    // temperature_f64
-    {
-        assert!(data_set.has_var("temperature_f64"));
-        let var: &Variable = data_set.get_var("temperature_f64").unwrap();
-        assert_eq!(DataType::F64, var.data_type());
-        assert!(var.get_f64().is_some());
-    }
+    assert_eq!(true,                            data_set.has_var(TEMP_U8_VAR_NAME));
+    assert_eq!(Some(DataType::U8),              data_set.var_data_type(TEMP_U8_VAR_NAME));
 }
 
 #[test]
-fn test_file_reader_read_vars()
-{
-    // Copy bytes to a temporary file
+fn test_file_reader_read_var_to_i16() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
-    // Read the data set
-    let data_set: DataSet = {
-        let mut file_reader = FileReader::open(input_data_file_path).unwrap();
-        // Load 3 variables
-        file_reader.read_vars(&["latitude", "longitude"]).unwrap();
-        file_reader.read_var("temperature_i32").unwrap();
+    let mut file_reader = FileReader::open(input_data_file_path).unwrap();
 
-        // Test the reading of undefined variables
-        match file_reader.read_vars(&["undef_var_1", "undef_var_2"]) {
-            Err(err) => {
-                assert_eq!(
-                    IOError::ReadData(ReadDataError::VariablesNotDefined(vec![String::from("undef_var_1"), String::from("undef_var_2")])),
-                    err,
-                )
-            },
-            _ => panic!("Unexpected error."),
-        }
-        match file_reader.read_var("undef_var_3") {
-            Err(err) => {
-                assert_eq!(
-                    IOError::ReadData(ReadDataError::VariablesNotDefined(vec![String::from("undef_var_3")])),
-                    err,
-                )
-            },
-            _ => panic!("Unexpected error."),
-        }
-        file_reader.close().0
-    };
+    {
+        let data_set: &DataSet = file_reader.data_set();
+        assert_eq!(true,                            data_set.has_var(TEMP_I16_VAR_NAME));
+        assert_eq!(Some(DataType::I16),             data_set.var_data_type(TEMP_I16_VAR_NAME));
+    }
+
+    assert_eq!(Ok(TEMP_I16_VAR_DATA.to_vec()),      file_reader.read_var_to_i16(TEMP_I16_VAR_NAME));
+
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::I16},
+        file_reader.read_var_to_i16(TEMP_I8_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::I16},
+        file_reader.read_var_to_i16(TEMP_U8_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::I16},
+        file_reader.read_var_to_i16(TEMP_I32_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::I16},
+        file_reader.read_var_to_i16(TEMP_F32_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::I16},
+        file_reader.read_var_to_i16(TEMP_F64_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableNotDefined(String::from("undef_var")),
+        file_reader.read_var_to_i16("undef_var").unwrap_err()
+    );
+
+    let data_set: DataSet = file_reader.close().0;
     tmp_dir.close().unwrap();
+    assert_eq!(true,                            data_set.has_var(TEMP_I16_VAR_NAME));
+    assert_eq!(Some(DataType::I16),              data_set.var_data_type(TEMP_I16_VAR_NAME));
+}
 
-    // Check variables previously loaded
-    // ---------------------------------
-    // latitude
+#[test]
+fn test_file_reader_read_var_to_i32() {
+    let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
+
+    let mut file_reader = FileReader::open(input_data_file_path).unwrap();
+
     {
-        assert!(data_set.has_var("latitude"));
-        let var: &Variable = data_set.get_var("latitude").unwrap();
-        assert_eq!(DataType::F32, var.data_type());
-        assert!(var.get_f32().is_some());
-    }
-    // longitude
-    {
-        assert!(data_set.has_var("longitude"));
-        let var: &Variable = data_set.get_var("longitude").unwrap();
-        assert_eq!(DataType::F32, var.data_type());
-        assert!(var.get_f32().is_some());
-    }
-    // temperature_i32
-    {
-        assert!(data_set.has_var("temperature_i32"));
-        let var: &Variable = data_set.get_var("temperature_i32").unwrap();
-        assert_eq!(DataType::I32, var.data_type());
-        assert!(var.get_i32().is_some());
+        let data_set: &DataSet = file_reader.data_set();
+        assert_eq!(true,                            data_set.has_var(TEMP_I32_VAR_NAME));
+        assert_eq!(Some(DataType::I32),             data_set.var_data_type(TEMP_I32_VAR_NAME));
     }
 
-    // Check variables not previously loaded
-    // -------------------------------------
-    // time
+    assert_eq!(Ok(TEMP_I32_VAR_DATA.to_vec()),      file_reader.read_var_to_i32(TEMP_I32_VAR_NAME));
+
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::I32},
+        file_reader.read_var_to_i32(TEMP_I8_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::I32},
+        file_reader.read_var_to_i32(TEMP_U8_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::I32},
+        file_reader.read_var_to_i32(TEMP_I16_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::I32},
+        file_reader.read_var_to_i32(TEMP_F32_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::I32},
+        file_reader.read_var_to_i32(TEMP_F64_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableNotDefined(String::from("undef_var")),
+        file_reader.read_var_to_i32("undef_var").unwrap_err()
+    );
+
+    let data_set: DataSet = file_reader.close().0;
+    tmp_dir.close().unwrap();
+    assert_eq!(true,                            data_set.has_var(TEMP_I32_VAR_NAME));
+    assert_eq!(Some(DataType::I32),             data_set.var_data_type(TEMP_I32_VAR_NAME));
+}
+
+#[test]
+fn test_file_reader_read_var_to_f32() {
+    let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
+
+    let mut file_reader = FileReader::open(input_data_file_path).unwrap();
+
     {
-        assert!(data_set.has_var("time"));
-        let var: &Variable = data_set.get_var("time").unwrap();
-        assert_eq!(DataType::F32, var.data_type());
-        assert!(var.get_f32().is_none());
-    }
-    // temperature_i8
-    {
-        assert!(data_set.has_var("temperature_i8"));
-        let var: &Variable = data_set.get_var("temperature_i8").unwrap();
-        assert_eq!(DataType::I8, var.data_type());
-        assert!(var.get_i8().is_none());
-    }
-    // temperature_u8
-    {
-        assert!(data_set.has_var("temperature_u8"));
-        let var: &Variable = data_set.get_var("temperature_u8").unwrap();
-        assert_eq!(DataType::U8, var.data_type());
-        assert!(var.get_u8().is_none());
-    }
-    // temperature_i16
-    {
-        assert!(data_set.has_var("temperature_i16"));
-        let var: &Variable = data_set.get_var("temperature_i16").unwrap();
-        assert_eq!(DataType::I16, var.data_type());
-        assert!(var.get_i16().is_none());
+        let data_set: &DataSet = file_reader.data_set();
+        assert_eq!(true,                            data_set.has_var(TEMP_F32_VAR_NAME));
+        assert_eq!(Some(DataType::F32),             data_set.var_data_type(TEMP_F32_VAR_NAME));
     }
 
-    // temperature_f32
+    assert_eq!(Ok(TEMP_F32_VAR_DATA.to_vec()),      file_reader.read_var_to_f32(TEMP_F32_VAR_NAME));
+
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::F32},
+        file_reader.read_var_to_f32(TEMP_I8_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::F32},
+        file_reader.read_var_to_f32(TEMP_U8_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::F32},
+        file_reader.read_var_to_f32(TEMP_I16_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::F32},
+        file_reader.read_var_to_f32(TEMP_I32_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::F32},
+        file_reader.read_var_to_f32(TEMP_F64_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableNotDefined(String::from("undef_var")),
+        file_reader.read_var_to_f32("undef_var").unwrap_err()
+    );
+
+    let data_set: DataSet = file_reader.close().0;
+    tmp_dir.close().unwrap();
+    assert_eq!(true,                            data_set.has_var(TEMP_F32_VAR_NAME));
+    assert_eq!(Some(DataType::F32),             data_set.var_data_type(TEMP_F32_VAR_NAME));
+}
+
+#[test]
+fn test_file_reader_read_var_to_f64() {
+    let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
+
+    let mut file_reader = FileReader::open(input_data_file_path).unwrap();
+
     {
-        assert!(data_set.has_var("temperature_f32"));
-        let var: &Variable = data_set.get_var("temperature_f32").unwrap();
-        assert_eq!(DataType::F32, var.data_type());
-        assert!(var.get_f32().is_none());
+        let data_set: &DataSet = file_reader.data_set();
+        assert_eq!(true,                            data_set.has_var(TEMP_F64_VAR_NAME));
+        assert_eq!(Some(DataType::F64),             data_set.var_data_type(TEMP_F64_VAR_NAME));
     }
-    // temperature_f64
-    {
-        assert!(data_set.has_var("temperature_f64"));
-        let var: &Variable = data_set.get_var("temperature_f64").unwrap();
-        assert_eq!(DataType::F64, var.data_type());
-        assert!(var.get_f64().is_none());
-    }
+
+    assert_eq!(Ok(TEMP_F64_VAR_DATA.to_vec()),      file_reader.read_var_to_f64(TEMP_F64_VAR_NAME));
+
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::F64},
+        file_reader.read_var_to_f64(TEMP_I8_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::F64},
+        file_reader.read_var_to_f64(TEMP_U8_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::F64},
+        file_reader.read_var_to_f64(TEMP_I16_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::F64},
+        file_reader.read_var_to_f64(TEMP_I32_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::F64},
+        file_reader.read_var_to_f64(TEMP_F32_VAR_NAME).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableNotDefined(String::from("undef_var")),
+        file_reader.read_var_to_f64("undef_var").unwrap_err()
+    );
+
+    let data_set: DataSet = file_reader.close().0;
+    tmp_dir.close().unwrap();
+    assert_eq!(true,                            data_set.has_var(TEMP_F64_VAR_NAME));
+    assert_eq!(Some(DataType::F64),             data_set.var_data_type(TEMP_F64_VAR_NAME));
 }
 
 #[test]
@@ -339,7 +353,7 @@ fn test_parse_non_neg_i32() {
         assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
         assert!(!parsing_err.is_incomplete());
-        assert_eq!(ParseErrorKind::NonNegativeI32 ,parsing_err.kind);
+        assert_eq!(ParseHeaderErrorKind::NonNegativeI32 ,parsing_err.kind);
         assert_eq!(
             InvalidBytes::Bytes(bytes.to_vec()),
             parsing_err.invalid_bytes,
@@ -356,7 +370,7 @@ fn test_parse_non_neg_i32() {
         assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
         assert!(!parsing_err.is_incomplete());
-        assert_eq!(ParseErrorKind::NonNegativeI32 ,parsing_err.kind);
+        assert_eq!(ParseHeaderErrorKind::NonNegativeI32 ,parsing_err.kind);
         assert_eq!(
             InvalidBytes::Bytes(bytes.to_vec()),
             parsing_err.invalid_bytes,
@@ -390,7 +404,7 @@ fn test_parse_non_neg_i32() {
         assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
         assert!(parsing_err.is_incomplete());
-        assert_eq!(ParseErrorKind::NonNegativeI32 ,parsing_err.kind);
+        assert_eq!(ParseHeaderErrorKind::NonNegativeI32 ,parsing_err.kind);
         assert_eq!(
             InvalidBytes::Incomplete(nom::Needed::Size(4)),
             parsing_err.invalid_bytes
@@ -412,12 +426,12 @@ fn test_parse_name_string() {
                 bytes.write_i32::<BigEndian>(num_of_bytes as i32).unwrap();
                 bytes.extend(word.as_bytes());
                 // Append zero-padding bytes if necessary
-                let num_bytes_zero_padding: usize = compute_num_bytes_zero_padding(num_of_bytes);
-                for _ in 0..num_bytes_zero_padding
+                let zero_padding_size: usize = compute_padding_size(num_of_bytes);
+                for _ in 0..zero_padding_size
                 {
                     bytes.push(0_u8);
                 }
-            
+
                 bytes
             };
             // Parse the bytes into a string
@@ -439,8 +453,8 @@ fn test_parse_name_string() {
                 bytes.write_i32::<BigEndian>(num_of_bytes as i32).unwrap();
                 bytes.extend(word.as_bytes());
                 // Append zero-padding bytes if necessary
-                let num_bytes_zero_padding: usize = compute_num_bytes_zero_padding(num_of_bytes);
-                for _ in 0..num_bytes_zero_padding
+                let zero_padding_size: usize = compute_padding_size(num_of_bytes);
+                for _ in 0..zero_padding_size
                 {
                     bytes.push(0_u8);
                 }
@@ -468,9 +482,9 @@ fn test_parse_name_string() {
                 bytes.write_i32::<BigEndian>(num_of_bytes as i32).unwrap();
                 bytes.extend(word.as_bytes());
                 // Append zero-padding bytes if necessary
-                let num_bytes_zero_padding: usize = compute_num_bytes_zero_padding(num_of_bytes);
-                assert!(num_bytes_zero_padding > 0);
-                for i in 0..num_bytes_zero_padding
+                let zero_padding_size: usize = compute_padding_size(num_of_bytes);
+                assert!(zero_padding_size > 0);
+                for i in 0..zero_padding_size
                 {
                     if i == 0 {
                         // Append a wrong bytes here
@@ -487,7 +501,7 @@ fn test_parse_name_string() {
             assert!(parsing_result.is_err());
             let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
             assert!(!parsing_err.is_incomplete());
-            assert_eq!(ParseErrorKind::ZeroPadding ,parsing_err.kind);
+            assert_eq!(ParseHeaderErrorKind::ZeroPadding ,parsing_err.kind);
             assert_eq!(InvalidBytes::Bytes(vec![1, 0, 0]) ,parsing_err.invalid_bytes);
         }
 
@@ -502,12 +516,12 @@ fn test_parse_name_string() {
                 bytes.write_i32::<BigEndian>(num_of_bytes as i32).unwrap();
                 bytes.extend(word.as_bytes());
                 // Append zero-padding bytes if necessary
-                let num_bytes_zero_padding: usize = compute_num_bytes_zero_padding(num_of_bytes);
-                for _ in 0..num_bytes_zero_padding
+                let zero_padding_size: usize = compute_padding_size(num_of_bytes);
+                for _ in 0..zero_padding_size
                 {
                     bytes.push(0_u8);
                 }
-            
+
                 bytes
             };
             // Parse the bytes into a string
@@ -530,12 +544,12 @@ fn test_parse_name_string() {
                 bytes.write_i32::<BigEndian>(num_of_bytes as i32).unwrap();
                 bytes.extend(&word);
                 // Append zero-padding bytes if necessary
-                let num_bytes_zero_padding: usize = compute_num_bytes_zero_padding(num_of_bytes);
-                for _ in 0..num_bytes_zero_padding
+                let zero_padding_size: usize = compute_padding_size(num_of_bytes);
+                for _ in 0..zero_padding_size
                 {
                     bytes.push(0_u8);
                 }
-            
+
                 bytes
             };
             // Parse the bytes into a string
@@ -545,7 +559,7 @@ fn test_parse_name_string() {
             assert!(parsing_result.is_err());
             let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
             assert!(!parsing_err.is_incomplete());
-            assert_eq!(ParseErrorKind::Utf8 ,parsing_err.kind);
+            assert_eq!(ParseHeaderErrorKind::Utf8 ,parsing_err.kind);
             assert_eq!(
                 InvalidBytes::Bytes(vec![b'c', b'a', b'f', b'\xe9']),
                 parsing_err.invalid_bytes,
@@ -563,8 +577,8 @@ fn test_parse_name_string() {
                 bytes.write_i32::<BigEndian>(num_of_bytes as i32).unwrap();
                 bytes.extend(word.as_bytes());
                 // Append zero-padding bytes if necessary
-                let num_bytes_zero_padding: usize = compute_num_bytes_zero_padding(num_of_bytes);
-                for _ in 0..num_bytes_zero_padding
+                let zero_padding_size: usize = compute_padding_size(num_of_bytes);
+                for _ in 0..zero_padding_size
                 {
                     bytes.push(0_u8);
                 }
@@ -581,7 +595,7 @@ fn test_parse_name_string() {
             assert!(parsing_result.is_err());
             let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
             assert!(parsing_err.is_incomplete());
-            assert_eq!(ParseErrorKind::ZeroPadding ,parsing_err.kind);
+            assert_eq!(ParseHeaderErrorKind::ZeroPadding ,parsing_err.kind);
             assert_eq!(
                 InvalidBytes::Incomplete(nom::Needed::Size(2)),
                 parsing_err.invalid_bytes,
@@ -589,7 +603,6 @@ fn test_parse_name_string() {
         }
     }
 }
-
 
 #[test]
 fn test_parse_data_type() {
@@ -669,7 +682,7 @@ fn test_parse_data_type() {
         assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
         assert!(!parsing_err.is_incomplete());
-        assert_eq!(ParseErrorKind::NonNegativeI32, parsing_err.kind);
+        assert_eq!(ParseHeaderErrorKind::NonNegativeI32, parsing_err.kind);
         assert_eq!(
             InvalidBytes::Bytes(bytes.to_vec()),
             parsing_err.invalid_bytes
@@ -703,14 +716,13 @@ fn test_parse_data_type() {
         assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
         assert!(parsing_err.is_incomplete());
-        assert_eq!(ParseErrorKind::NonNegativeI32, parsing_err.kind);
+        assert_eq!(ParseHeaderErrorKind::NonNegativeI32, parsing_err.kind);
         assert_eq!(
             InvalidBytes::Incomplete(nom::Needed::Size(4)),
             parsing_err.invalid_bytes
         );
     }
 }
-
 
 #[test]
 fn test_parse_zero_padding() {
@@ -731,7 +743,7 @@ fn test_parse_zero_padding() {
         let parsing_err = parsing_result.unwrap_err();
         assert!(!parsing_err.is_incomplete());
         assert_eq!(
-            ParseErrorKind::ZeroPadding,
+            ParseHeaderErrorKind::ZeroPadding,
             parsing_err.kind,
         );
         assert_eq!(
@@ -748,7 +760,7 @@ fn test_parse_zero_padding() {
         let parsing_err = parsing_result.unwrap_err();
         assert!(parsing_err.is_incomplete());
         assert_eq!(
-            ParseErrorKind::ZeroPadding,
+            ParseHeaderErrorKind::ZeroPadding,
             parsing_err.kind,
         );
         assert_eq!(

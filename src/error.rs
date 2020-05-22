@@ -1,19 +1,56 @@
-pub mod input_error;
-use input_error::{ParseHeaderError, ReadDataError};
+pub mod parse_header_error;
+use parse_header_error::ParseHeaderError;
 
-use crate::DataType;
+use std::rc::Rc;
+use crate::{Dimension, DataType};
 
-/// NetCDF-3 data errors.
+/// NetCDF-3 data set error
+///
+/// This error occures when the induced [`DataSet`](struct.DataSet.html) is not a valid NetCDF-3 data set.
+///
+/// # Example
+///
+/// ```
+/// use netcdf3::{
+///     DataSet,
+///     error::InvalidDataSet,
+/// };
+///
+/// const VAR_NAME: &str = "var_1";
+/// const DIM_NAME_1: &str = "undef_dim_1";
+/// const DIM_NAME_2: &str = "undef_dim_2";
+///
+/// // Create a data set
+/// let mut data_set = DataSet::new();
+///
+/// assert_eq!(0,           data_set.num_vars());
+/// assert_eq!(false,       data_set.has_var(VAR_NAME));
+///
+/// // Try to add a new variable
+/// assert_eq!(
+///     InvalidDataSet::DimensionsNotDefined{
+///         var_name: String::from(VAR_NAME),
+///         undef_dim_names: vec![String::from(DIM_NAME_1), String::from(DIM_NAME_2)],
+///     },
+///     data_set.add_var_i8(VAR_NAME, &[DIM_NAME_1, DIM_NAME_2]).unwrap_err()
+/// );
+///
+/// assert_eq!(0,           data_set.num_vars());
+/// assert_eq!(false,       data_set.has_var(VAR_NAME));
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InvalidDataSet {
     DimensionAlreadyExists(String),
     DimensionNotDefined(String),
-    DimensionsNotDefined{var_name: String, get_undef_dim_names: Vec<String>},
+    DimensionsNotDefined{var_name: String, undef_dim_names: Vec<String>},
     DimensionsUsedMultipleTimes{var_name: String, get_dim_names: Vec<String>},
     UnlimitedDimensionAlreadyExists(String),
     DimensionYetUsed{var_names: Vec<String>, dim_name: String},
-    DimensionsIdsNotValid(Vec<usize>),
     DimensionNameNotValid(String),
+    DimensionIdsNotFound{defined: Vec<usize>, searched: Vec<usize>, not_found: Vec<usize>},
+    FixedDimensionWithZeroSize(String),
+    MaximumFixedDimensionSizeExceeded{dim_name: String, get: usize},
+    DimensionsNotFound{defined: Vec<Rc<Dimension>>, searched: Vec<Rc<Dimension>>, not_found: Vec<Rc<Dimension>>},
 
     VariableAttributeAlreadyExists{var_name: String, attr_name: String},
     VariableAttributeNotDefined{var_name: String, attr_name: String},
@@ -25,6 +62,7 @@ pub enum InvalidDataSet {
     VariableMismatchDataType{var_name: String, req: DataType, get: DataType},
     VariableMismatchDataLength{var_name: String, req: usize, get: usize},
     UnlimitedDimensionMustBeDefinedFirst{var_name: String, unlim_dim_name: String, get_dim_names: Vec<String>},
+    MaximumDimensionsPerVariableExceeded{var_name: String, num_dims: usize},
 
     GlobalAttributeAlreadyExists(String),
     GlobalAttributeNotDefined(String),
@@ -39,36 +77,57 @@ impl std::fmt::Display for InvalidDataSet {
 
 impl std::error::Error for InvalidDataSet {}
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum IOError {
-    ReadData(ReadDataError),
+pub enum ReadError {
     ParseHeader(ParseHeaderError),
     DataSet(InvalidDataSet),
+    VariableNotDefined(String),
+    VariableMismatchDataType{var_name: String, req: DataType, get: DataType},
+    IOErrorKind(std::io::ErrorKind),
+    Unexpected,
 }
 
-impl std::fmt::Display for IOError {
+impl std::fmt::Display for ReadError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl std::error::Error for IOError {}
+impl std::error::Error for ReadError {}
 
-impl std::convert::From<InvalidDataSet> for IOError {
+impl std::convert::From<InvalidDataSet> for ReadError {
     fn from(err: InvalidDataSet) -> Self {
         Self::DataSet(err)
     }
 }
 
-impl std::convert::From<ParseHeaderError> for IOError {
+impl std::convert::From<ParseHeaderError> for ReadError {
     fn from(err: ParseHeaderError) -> Self {
         Self::ParseHeader(err)
     }
 }
 
-impl std::convert::From<ReadDataError> for IOError {
-    fn from(err: ReadDataError) -> Self {
-        Self::ReadData(err)
+impl std::convert::From<std::io::Error> for ReadError {
+    fn from(err: std::io::Error) -> Self {
+        Self::IOErrorKind(err.kind())
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WriteError {
+    IOErrorKind(std::io::ErrorKind),
+    VariableNotDefined(String),
+    VariableMismatchDataType{var_name: String, req: DataType, get: DataType},
+    VariableMismatchDataLength{var_name: String, req: usize, get: usize},
+    ClassicVersionNotPossible,
+    HeaderAlreadyDefined,
+    HeaderNotDefined,
+    Unexpected,
+}
+
+impl std::convert::From<std::io::Error> for WriteError {
+    fn from(err: std::io::Error) -> Self {
+        WriteError::IOErrorKind(err.kind())
     }
 }

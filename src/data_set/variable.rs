@@ -2,9 +2,10 @@ use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::rc::Rc;
 
-use crate::{name_string::is_valid_name, data_vector::DataVector};
-use crate::{Attribute, DataType, Dimension, InvalidDataSet};
-use crate::io::compute_num_bytes_zero_padding;
+use crate::{is_valid_name, Attribute, DataType, Dimension, InvalidDataSet, NC_MAX_VAR_DIMS};
+use crate::{data_set::dimension::DimensionSize};
+use crate::io::compute_padding_size;
+
 
 /// NetCDF-3 variable
 ///
@@ -36,64 +37,17 @@ use crate::io::compute_num_bytes_zero_padding;
 /// data_set.add_fixed_dim(DIM_NAME_2, DIM_SIZE_2).unwrap();
 /// // Define a `f32` variable
 /// data_set.add_var_f32(VAR_NAME, &[DIM_NAME_1, DIM_NAME_2]).unwrap();
-/// // Set a data vector
-/// data_set.set_var_f32(VAR_NAME, DATA_F32.to_vec()).unwrap();
 ///
-/// // Get values stored in the file header
-/// assert_eq!(1,                                   data_set.num_vars());
-/// assert_eq!(2,                                   data_set.num_dims());
-/// assert_eq!(Some(DIM_SIZE_1),                    data_set.get_dim_size(DIM_NAME_1));
-/// assert_eq!(true,                                data_set.has_unlimited_dim());
-/// assert_eq!(true,                                data_set.has_dim(DIM_NAME_1));
-/// assert_eq!(Some(DimensionType::UnlimitedSize),  data_set.get_dim_type(DIM_NAME_1));
-/// assert_eq!(true,                                data_set.has_dim(DIM_NAME_2));
-/// assert_eq!(Some(DIM_SIZE_2),                    data_set.get_dim_size(DIM_NAME_2));
-/// assert_eq!(Some(DimensionType::FixedSize),      data_set.get_dim_type(DIM_NAME_2));
-/// assert_eq!(true,                                data_set.has_var(VAR_NAME));
-/// assert_eq!(Some(0),                             data_set.num_var_attrs(VAR_NAME));
-/// assert_eq!(Some(DATA_F32_LEN),                  data_set.get_var_len(VAR_NAME));
-/// assert_eq!(Some(DataType::F32),                 data_set.get_var_data_type(VAR_NAME));
-///
-/// // Get `f32` data thought the data set
-/// assert_eq!(None,                data_set.get_var_i8(VAR_NAME));
-/// assert_eq!(None,                data_set.get_var_u8(VAR_NAME));
-/// assert_eq!(None,                data_set.get_var_i16(VAR_NAME));
-/// assert_eq!(None,                data_set.get_var_i32(VAR_NAME));
-/// assert_eq!(Some(&DATA_F32[..]), data_set.get_var_f32(VAR_NAME));
-/// assert_eq!(None,                data_set.get_var_f64(VAR_NAME));
-/// 
-/// // Or through a reference to the variable
+/// assert_eq!(true,            data_set.has_var(VAR_NAME));
 /// let var: &Variable = data_set.get_var(VAR_NAME).unwrap();
 /// assert_eq!(VAR_NAME,                        var.name());
 /// assert_eq!(true,                            var.is_record_var());
 /// assert_eq!(2,                               var.num_dims());
 /// assert_eq!(0,                               var.num_attrs());
-/// assert_eq!(vec![DIM_NAME_1, DIM_NAME_2],    var.get_dim_names());
+/// assert_eq!(vec![DIM_NAME_1, DIM_NAME_2],    var.dim_names());
 /// assert_eq!(DATA_F32_LEN,                    var.len());
 /// assert_eq!(DataType::F32,                   var.data_type());
 ///
-/// assert_eq!(None,                            var.get_i8());
-/// assert_eq!(None,                            var.get_u8());
-/// assert_eq!(None,                            var.get_i16());
-/// assert_eq!(None,                            var.get_i32());
-/// assert_eq!(Some(&DATA_F32[..]),             var.get_f32());
-/// assert_eq!(None,                            var.get_f64());
-/// ```
-/// ## Get a reference to a `Variable`
-///
-/// ```
-/// # use netcdf3::{DataSet, Variable, DataType};
-/// const VAR_NAME: &str = "var_1";
-/// # // Create a new data set
-/// # let mut data_set: DataSet = DataSet::new();
-/// # // Create a new (empty) variable
-/// # data_set.add_var::<&str>(VAR_NAME, &[], DataType::F32).unwrap();
-///
-/// // Get a reference to a `Variable`
-/// let var: &Variable = data_set.get_var(VAR_NAME).unwrap();
-///
-/// // Get a mutable reference to a `Variable`
-/// let var: &mut Variable = data_set.get_var_mut(VAR_NAME).unwrap();
 /// ```
 ///
 /// ## Rename a variable
@@ -110,30 +64,25 @@ use crate::io::compute_num_bytes_zero_padding;
 /// let mut data_set: DataSet = DataSet::new();
 /// data_set.add_fixed_dim(DIM_NAME, VAR_DATA_LEN).unwrap();
 /// data_set.add_var_i32::<&str>(VAR_NAME_1, &[DIM_NAME]).unwrap();
-/// data_set.set_var_i32(VAR_NAME_1, VAR_DATA.to_vec()).unwrap();
 ///
 /// assert_eq!(1,                   data_set.num_vars());
 /// assert_eq!(true,                data_set.has_var(VAR_NAME_1));
-/// assert_eq!(Some(VAR_DATA_LEN),  data_set.get_var_len(VAR_NAME_1));
-/// assert_eq!(Some(DataType::I32), data_set.get_var_data_type(VAR_NAME_1));
-/// assert_eq!(Some(&VAR_DATA[..]), data_set.get_var_i32(VAR_NAME_1));
+/// assert_eq!(Some(VAR_DATA_LEN),  data_set.var_len(VAR_NAME_1));
+/// assert_eq!(Some(DataType::I32), data_set.var_data_type(VAR_NAME_1));
 /// assert_eq!(false,               data_set.has_var(VAR_NAME_2));
-/// assert_eq!(None,                data_set.get_var_len(VAR_NAME_2));
-/// assert_eq!(None,                data_set.get_var_data_type(VAR_NAME_2));
-/// assert_eq!(None,                data_set.get_var_i32(VAR_NAME_2));
+/// assert_eq!(None,                data_set.var_len(VAR_NAME_2));
+/// assert_eq!(None,                data_set.var_data_type(VAR_NAME_2));
 ///
 /// // Rename the variable
 /// data_set.rename_var(VAR_NAME_1, VAR_NAME_2).unwrap();
 ///
 /// assert_eq!(1,                   data_set.num_vars());
 /// assert_eq!(false,               data_set.has_var(VAR_NAME_1));
-/// assert_eq!(None,                data_set.get_var_len(VAR_NAME_1));
-/// assert_eq!(None,                data_set.get_var_data_type(VAR_NAME_1));
-/// assert_eq!(None,                data_set.get_var_i32(VAR_NAME_1));
+/// assert_eq!(None,                data_set.var_len(VAR_NAME_1));
+/// assert_eq!(None,                data_set.var_data_type(VAR_NAME_1));
 /// assert_eq!(true,                data_set.has_var(VAR_NAME_2));
-/// assert_eq!(Some(VAR_DATA_LEN),  data_set.get_var_len(VAR_NAME_2));
-/// assert_eq!(Some(DataType::I32), data_set.get_var_data_type(VAR_NAME_2));
-/// assert_eq!(Some(&VAR_DATA[..]), data_set.get_var_i32(VAR_NAME_2));
+/// assert_eq!(Some(VAR_DATA_LEN),  data_set.var_len(VAR_NAME_2));
+/// assert_eq!(Some(DataType::I32), data_set.var_data_type(VAR_NAME_2));
 /// ```
 ///
 /// ## Remove a variable
@@ -151,31 +100,28 @@ use crate::io::compute_num_bytes_zero_padding;
 ///
 /// data_set.add_fixed_dim(DIM_NAME, VAR_DATA_LEN).unwrap();
 /// data_set.add_var_i32::<&str>(VAR_NAME, &[DIM_NAME]).unwrap();
-/// data_set.set_var_i32(VAR_NAME, VAR_DATA.to_vec()).unwrap();
 ///
 /// assert_eq!(1,                   data_set.num_vars());
 /// assert_eq!(true,                data_set.has_var(VAR_NAME));
-/// assert_eq!(Some(VAR_DATA_LEN),  data_set.get_var_len(VAR_NAME));
-/// assert_eq!(Some(DataType::I32), data_set.get_var_data_type(VAR_NAME));
-/// assert_eq!(Some(&VAR_DATA[..]), data_set.get_var_i32(VAR_NAME));
+/// assert_eq!(Some(VAR_DATA_LEN),  data_set.var_len(VAR_NAME));
+/// assert_eq!(Some(DataType::I32), data_set.var_data_type(VAR_NAME));
 ///
 /// // Remove the variable
 /// data_set.remove_var(VAR_NAME).unwrap();
 ///
 /// assert_eq!(0,       data_set.num_vars());
 /// assert_eq!(false,   data_set.has_var(VAR_NAME));
-/// assert_eq!(None,    data_set.get_var_len(VAR_NAME));
-/// assert_eq!(None,    data_set.get_var_data_type(VAR_NAME));
-/// assert_eq!(None,    data_set.get_var_i32(VAR_NAME));
+/// assert_eq!(None,    data_set.var_len(VAR_NAME));
+/// assert_eq!(None,    data_set.var_data_type(VAR_NAME));
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
-    pub(in crate::data_set) name: String,
-    pub(in crate::data_set) unlimited_dim: Option<Rc<Dimension>>,
-    pub(in crate::data_set) dims: Vec<Rc<Dimension>>,
-    pub(in crate::data_set) attrs: Vec<Attribute>,
-    pub(in crate::data_set) data_type: DataType,
-    pub(crate) data: Option<DataVector>,
+    pub(crate) name: String,
+    pub(crate) unlimited_dim: Option<Rc<Dimension>>,
+    pub(crate) dims: Vec<Rc<Dimension>>,
+    pub(crate) attrs: Vec<Attribute>,
+    pub(crate) data_type: DataType,
+    // pub(crate) data: Option<DataVector>,
 }
 
 impl Variable {
@@ -198,7 +144,7 @@ impl Variable {
             dims: var_dims,
             attrs: vec![],
             data_type: data_type,
-            data: None,
+            // data: None,
         })
     }
 
@@ -207,23 +153,64 @@ impl Variable {
         return &self.name;
     }
 
-    /// Returns the name of the variable.
+    /// Returns the data type of the variable.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use netcdf3::{DataSet, Variable, DataType};
+    /// const VAR_NAME: &str = "var_1";
+    ///
+    /// let data_set: DataSet = {
+    ///     let mut data_set = DataSet::new();
+    ///     data_set.add_var_i32::<&str>(VAR_NAME, &[]).unwrap();
+    ///     data_set
+    /// };
+    ///
+    /// let var: &Variable = data_set.get_var(VAR_NAME).unwrap();
+    /// assert_eq!(DataType::I32,       var.data_type());
+    /// ```
     pub fn data_type(&self) -> DataType {
         return self.data_type.clone();
     }
 
+    // /// Returns `true` if the variable contains its typed data.
+    // ///
+    // /// # Example
+    // ///
+    // /// ```
+    // /// use netcdf3::{DataSet, Variable};
+    // /// const VAR_NAME: &str = "var_1";
+    // /// const DIM_NAME: &str = "dim_1";
+    // /// const DIM_SIZE: usize = 3;
+    // ///
+    // /// let mut data_set = DataSet::new();
+    // /// data_set.add_fixed_dim(DIM_NAME, DIM_SIZE).unwrap();
+    // /// data_set.add_var_i32(VAR_NAME, &[DIM_NAME]).unwrap();
+    // ///
+    // /// let var: &mut Variable = data_set.get_var_mut(VAR_NAME).unwrap();
+    // /// assert_eq!(false,                       var.has_data());
+    // /// assert_eq!(None,                        var.get_i32());
+    // /// var.set_i32(vec![1, 2, 3]).unwrap();
+    // /// assert_eq!(true,                        var.has_data());
+    // /// assert_eq!(Some(&[1, 2, 3][..]),        var.get_i32());
+    // /// ```
+    // pub fn has_data(&self) -> bool {
+    //     return self.data.is_some();
+    // }
+
     /// Returns the total number of elements.
     ///
-    /// If the variable is a record variable then `len = num_chunks * num_elements_per_chunk`.
+    /// If the variable is a record variable then `len = num_chunks * chunk_len`.
     pub fn len(&self) -> usize {
-        return self.num_chunks() * self.num_elements_per_chunk();
+        return self.num_chunks() * self.chunk_len();
     }
 
     pub fn use_dim(&self, dim_name: &str) -> bool {
         return self.dims.iter().position(|dim| *dim.name.borrow() == dim_name).is_some();
     }
 
-    /// Returns the number of dimensions.
+    /// Returns the number of dimensions (the rank) the the variables
     pub fn num_dims(&self) -> usize {
         return self.dims.len();
     }
@@ -235,7 +222,7 @@ impl Variable {
     }
 
     /// Returns the list of the dimension names
-    pub fn get_dim_names(&self) -> Vec<String>
+    pub fn dim_names(&self) -> Vec<String>
     {
         self.dims.iter().map(|dim: &Rc<Dimension>| {
             dim.name().to_string()
@@ -247,13 +234,9 @@ impl Variable {
     /// - `true` if the variable is defined over the *unlimited size* dimension, then has several records
     /// - `false` otherwise
     pub fn is_record_var(&self) -> bool {
-        if self.dims.is_empty()
-        {
-            return false;
-        }
-        else
-        {
-            return self.dims[0].is_unlimited();
+        match self.dims.first() {
+            None => false,
+            Some(first_dim) => first_dim.is_unlimited()
         }
     }
 
@@ -270,8 +253,10 @@ impl Variable {
         return self.find_attr_from_name(attr_name).is_ok();
     }
 
-    // Returns the number of elements per chunk.
-    pub fn num_elements_per_chunk(&self) -> usize
+    /// Returns the number of elements per chunk.
+    ///
+    /// If the variable id a *fixed-size* variable then `chunk_len = len`.
+    pub fn chunk_len(&self) -> usize
     {
         let skip_len: usize = if self.is_record_var() { 1 } else { 0 };
         self.dims.iter().skip(skip_len).fold(1, |product, dim| {
@@ -279,31 +264,61 @@ impl Variable {
         })
     }
 
-    /// Returns the size of each chunk (the number of bytes) including *zero-padding* bytes.
+    /// Returns the size of each chunk (the number of bytes) including the padding bytes.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use netcdf3::{DataSet, Variable};
+    ///
+    /// const VAR_I8_NAME: &str = "scalar_var_i8";
+    /// const VAR_U8_NAME: &str = "scalar_var_u8";
+    /// const VAR_I16_NAME: &str = "scalar_var_i16";
+    /// const VAR_I32_NAME: &str = "scalar_var_i32";
+    /// const VAR_F32_NAME: &str = "scalar_var_f32";
+    /// const VAR_F64_NAME: &str = "scalar_var_f64";
+    ///
+    /// let data_set: DataSet = {
+    ///     let mut data_set = DataSet::new();
+    ///     data_set.add_var_i8::<&str>(VAR_I8_NAME, &[]).unwrap();
+    ///     data_set.add_var_u8::<&str>(VAR_U8_NAME, &[]).unwrap();
+    ///     data_set.add_var_i16::<&str>(VAR_I16_NAME, &[]).unwrap();
+    ///     data_set.add_var_i32::<&str>(VAR_I32_NAME, &[]).unwrap();
+    ///     data_set.add_var_f32::<&str>(VAR_F32_NAME, &[]).unwrap();
+    ///     data_set.add_var_f64::<&str>(VAR_F64_NAME, &[]).unwrap();
+    ///     data_set
+    /// };
+    ///
+    /// let scalar_var_i8: &Variable = data_set.get_var(VAR_I8_NAME).unwrap();
+    /// let scalar_var_u8: &Variable = data_set.get_var(VAR_U8_NAME).unwrap();
+    /// let scalar_var_i16: &Variable = data_set.get_var(VAR_I16_NAME).unwrap();
+    /// let scalar_var_i32: &Variable = data_set.get_var(VAR_I32_NAME).unwrap();
+    /// let scalar_var_f32: &Variable = data_set.get_var(VAR_F32_NAME).unwrap();
+    /// let scalar_var_f64: &Variable = data_set.get_var(VAR_F64_NAME).unwrap();
+    ///
+    /// assert_eq!(4,       scalar_var_i8.chunk_size());
+    /// assert_eq!(4,       scalar_var_u8.chunk_size());
+    /// assert_eq!(4,       scalar_var_i16.chunk_size());
+    /// assert_eq!(4,       scalar_var_i32.chunk_size());
+    /// assert_eq!(4,       scalar_var_f32.chunk_size());
+    /// assert_eq!(8,       scalar_var_f64.chunk_size());
+    /// ```
     pub fn chunk_size(&self) -> usize {
-        if self.dims.len() == 0
-        {
-            return 0;
-        }
-        else
-        {
-            let mut chunk_size = self.num_elements_per_chunk() * self.data_type.size_of();
-            // append the bytes of the zero padding, if necessary
-            chunk_size += compute_num_bytes_zero_padding(chunk_size);
-            return chunk_size
-        }
+        let mut chunk_size = self.chunk_len() * self.data_type.size_of();
+        // append the bytes of the zero padding, if necessary
+        chunk_size += compute_padding_size(chunk_size);
+        return chunk_size
     }
 
     /// Returns the number of chunks.
     pub fn num_chunks(&self) -> usize {
-        if self.dims.is_empty()
-        {
-            0
-        }
-        else {
-            match &self.unlimited_dim {
-                None => 1_usize,
-                Some(unlimited_dim) => unlimited_dim.size() as usize,
+        match self.dims.first() {
+            None => 1,  // Case : a scalar *fixed-size* variable
+            Some(first_dim) => {
+                match &first_dim.size {
+                    DimensionSize::Fixed(_) => 1,
+                    DimensionSize::Unlimited(size) => *size.borrow(),
+                }
             }
         }
     }
@@ -328,6 +343,62 @@ impl Variable {
         }).ok();
     }
 
+    /// Returns the attribute value as a `&[i8]`.
+    ///
+    /// Also see the method [Attribute::get_i8](struct.Attribute.html#method.get_i8).
+    pub fn get_attr_i8(&self, attr_name: &str) -> Option<&[i8]> {
+        let attr: &Attribute = self.get_attr(attr_name)?;
+        attr.get_i8()
+    }
+
+    /// Returns the attribute value as a `&[u8]`.
+    ///
+    /// Also see the method [Attribute::get_u8](struct.Attribute.html#method.get_u8).
+    pub fn get_attr_u8(&self, attr_name: &str) -> Option<&[u8]> {
+        let attr: &Attribute = self.get_attr(attr_name)?;
+        attr.get_u8()
+    }
+
+    /// Returns the attribute value as a `String`.
+    ///
+    /// Also see the method [Attribute::get_as_string](struct.Attribute.html#method.get_as_string).
+    pub fn get_attr_as_string(&self, attr_name: &str) -> Option<String> {
+        let attr: &Attribute = self.get_attr(attr_name)?;
+        attr.get_as_string()
+    }
+
+    /// Returns the attribute value as a `&[i16]`.
+    ///
+    /// Also see the method [Attribute::get_i16](struct.Attribute.html#method.get_i16).
+    pub fn get_attr_i16(&self, attr_name: &str) -> Option<&[i16]> {
+        let attr: &Attribute = self.get_attr(attr_name)?;
+        attr.get_i16()
+    }
+
+    /// Returns the attribute value as a `&[i32]`.
+    ///
+    /// Also see the method [Attribute::get_i32](struct.Attribute.html#method.get_i32).
+    pub fn get_attr_i32(&self, attr_name: &str) -> Option<&[i32]> {
+        let attr: &Attribute = self.get_attr(attr_name)?;
+        attr.get_i32()
+    }
+
+    /// Returns the attribute value as a `&[f32]`.
+    ///
+    /// Also see the method [Attribute::get_f32](struct.Attribute.html#method.get_f32).
+    pub fn get_attr_f32(&self, attr_name: &str) -> Option<&[f32]> {
+        let attr: &Attribute = self.get_attr(attr_name)?;
+        attr.get_f32()
+    }
+
+    /// Returns the attribute value as a `&[f64]`.
+    ///
+    /// Also see the method [Attribute::get_f64](struct.Attribute.html#method.get_f64).
+    pub fn get_attr_f64(&self, attr_name: &str) -> Option<&[f64]> {
+        let attr: &Attribute = self.get_attr(attr_name)?;
+        attr.get_f64()
+    }
+
     /// Appends a new attribute.
     ///
     /// An error is returned if an other attribute with the same name has already been added.
@@ -347,7 +418,7 @@ impl Variable {
     /// Append a new `i8` attribute.
     ///
     /// An error is returned if an other attribute with the same name has already been added.
-    pub(in crate::data_set) fn add_attr_i8(&mut self, attr_name: &str, i8_data: Vec<i8>) -> Result<(), InvalidDataSet> {
+    pub fn add_attr_i8(&mut self, attr_name: &str, i8_data: Vec<i8>) -> Result<(), InvalidDataSet> {
         let attr: Attribute = Attribute::new_i8(attr_name, i8_data)
             .map_err(|var_attr_name: String| InvalidDataSet::VariableAttributeNameNotValid{
                 var_name: self.name.to_string(),
@@ -360,7 +431,7 @@ impl Variable {
     /// Append a new `u8` attribute.
     ///
     /// An error is returned if an other attribute with the same name has already been added.
-    pub(in crate::data_set) fn add_attr_u8(&mut self, attr_name: &str, u8_data: Vec<u8>) -> Result<(), InvalidDataSet> {
+    pub fn add_attr_u8(&mut self, attr_name: &str, u8_data: Vec<u8>) -> Result<(), InvalidDataSet> {
         let attr: Attribute = Attribute::new_u8(attr_name, u8_data)
             .map_err(|var_attr_name: String| InvalidDataSet::VariableAttributeNameNotValid{
                 var_name: self.name.to_string(),
@@ -370,10 +441,18 @@ impl Variable {
         Ok(())
     }
 
+    /// Append a new `u8` attribute.
+    ///
+    /// An error is returned if an other attribute with the same name has already been added.
+    pub fn add_attr_string<T: AsRef<str>>(&mut self, attr_name: &str, str_data: T) -> Result<(), InvalidDataSet> {
+        self.add_attr_u8(attr_name, String::from(str_data.as_ref()).into_bytes())
+    }
+
+
     /// Append a new `i16` attribute.
     ///
     /// An error is returned if an other attribute with the same name has already been added.
-    pub(in crate::data_set) fn add_attr_i16(&mut self, attr_name: &str, i16_data: Vec<i16>) -> Result<(), InvalidDataSet> {
+    pub fn add_attr_i16(&mut self, attr_name: &str, i16_data: Vec<i16>) -> Result<(), InvalidDataSet> {
         let attr: Attribute = Attribute::new_i16(attr_name, i16_data)
             .map_err(|var_attr_name: String| InvalidDataSet::VariableAttributeNameNotValid{
                 var_name: self.name.to_string(),
@@ -386,7 +465,7 @@ impl Variable {
     /// Append a new `i32` attribute.
     ///
     /// An error is returned if an other attribute with the same name has already been added.
-    pub(in crate::data_set) fn add_attr_i32(&mut self, attr_name: &str, i32_data: Vec<i32>) -> Result<(), InvalidDataSet> {
+    pub fn add_attr_i32(&mut self, attr_name: &str, i32_data: Vec<i32>) -> Result<(), InvalidDataSet> {
         let attr: Attribute = Attribute::new_i32(attr_name, i32_data)
             .map_err(|var_attr_name: String| InvalidDataSet::VariableAttributeNameNotValid{
                 var_name: self.name.to_string(),
@@ -399,7 +478,7 @@ impl Variable {
     /// Append a new `f32` attribute.
     ///
     /// An error is returned if an other attribute with the same name has already been added.
-    pub(in crate::data_set) fn add_attr_f32(&mut self, attr_name: &str, f32_data: Vec<f32>) -> Result<(), InvalidDataSet> {
+    pub fn add_attr_f32(&mut self, attr_name: &str, f32_data: Vec<f32>) -> Result<(), InvalidDataSet> {
         let attr: Attribute = Attribute::new_f32(attr_name, f32_data)
             .map_err(|var_attr_name: String| InvalidDataSet::VariableAttributeNameNotValid{
                 var_name: self.name.to_string(),
@@ -412,7 +491,7 @@ impl Variable {
     /// Append a new `f64` attribute.
     ///
     /// An error is returned if an other attribute with the same name has already been added.
-    pub(in crate::data_set) fn add_attr_f64(&mut self, attr_name: &str, f64_data: Vec<f64>) -> Result<(), InvalidDataSet> {
+    pub fn add_attr_f64(&mut self, attr_name: &str, f64_data: Vec<f64>) -> Result<(), InvalidDataSet> {
         let attr: Attribute = Attribute::new_f64(attr_name, f64_data)
             .map_err(|var_attr_name: String| InvalidDataSet::VariableAttributeNameNotValid{
                 var_name: self.name.to_string(),
@@ -521,358 +600,109 @@ impl Variable {
                 get_dim_names: dim_names,
             });
         }
+        if dims.len() > NC_MAX_VAR_DIMS {
+            return Err(InvalidDataSet::MaximumDimensionsPerVariableExceeded{
+                var_name: var_name.to_string(),
+                num_dims: dims.len(),
+            })
+        }
         Ok(())
     }
+}
+
+#[cfg(test)]
+mod tests
+{
+    use crate::{DataSet, Variable};
 
 
-    /// Returns a reference to the `i8` data vector.
-    ///
-    /// Returns `None` if :
-    ///
-    /// - The variable is not a `i8` data variable.
-    /// - The data are not initialized or not be loaded while the file reading.
-    ///
-    /// # Example
-    /// ```
-    /// use netcdf3::{DataSet, DataType, InvalidDataSet};
-    ///
-    /// const DIM_NAME: &str = "dim_1";
-    ///
-    /// const VAR_I32_NAME: &str = "var_i8";
-    /// const DATA_I32: [i32; 3] = [1, 2, 3];
-    /// const DATA_I32_LEN: usize = DATA_I32.len();
-    ///
-    /// // Create a new data set, one dimension
-    /// let mut data_set = DataSet::new();
-    /// data_set.add_fixed_dim(DIM_NAME, DATA_I32_LEN).unwrap();
-    ///
-    /// assert_eq!(0,       data_set.num_vars());
-    /// assert_eq!(false,   data_set.has_var(VAR_I32_NAME));
-    /// assert_eq!(None,    data_set.get_var_len(VAR_I32_NAME));
-    /// assert_eq!(None,    data_set.get_var_data_type(VAR_I32_NAME));
-    /// assert_eq!(None,    data_set.get_var_i8(VAR_I32_NAME));
-    /// assert_eq!(None,    data_set.get_var_u8(VAR_I32_NAME));
-    /// assert_eq!(None,    data_set.get_var_i16(VAR_I32_NAME));
-    /// assert_eq!(None,    data_set.get_var_i32(VAR_I32_NAME));
-    /// assert_eq!(None,    data_set.get_var_f32(VAR_I32_NAME));
-    /// assert_eq!(None,    data_set.get_var_f64(VAR_I32_NAME));
-    ///
-    /// // Create a `i32` variable but don't set its values.
-    /// data_set.add_var_i32(VAR_I32_NAME, &[DIM_NAME]).unwrap();
-    ///
-    /// assert_eq!(1,                   data_set.num_vars());
-    /// assert_eq!(true,                data_set.has_var(VAR_I32_NAME));
-    /// assert_eq!(Some(DATA_I32_LEN),  data_set.get_var_len(VAR_I32_NAME));
-    /// assert_eq!(Some(DataType::I32), data_set.get_var_data_type(VAR_I32_NAME));
-    /// assert_eq!(None,                data_set.get_var_i8(VAR_I32_NAME));
-    /// assert_eq!(None,                data_set.get_var_u8(VAR_I32_NAME));
-    /// assert_eq!(None,                data_set.get_var_i16(VAR_I32_NAME));
-    /// assert_eq!(None,                data_set.get_var_i32(VAR_I32_NAME));
-    /// assert_eq!(None,                data_set.get_var_f32(VAR_I32_NAME));
-    /// assert_eq!(None,                data_set.get_var_f64(VAR_I32_NAME));
-    ///
-    /// // Set a data vector in the `i32` variable
-    /// data_set.set_var_i32(VAR_I32_NAME, DATA_I32.to_vec()).unwrap();
-    ///
-    /// assert_eq!(1,                   data_set.num_vars());
-    /// assert_eq!(true,                data_set.has_var(VAR_I32_NAME));
-    /// assert_eq!(Some(DATA_I32_LEN),  data_set.get_var_len(VAR_I32_NAME));
-    /// assert_eq!(Some(DataType::I32), data_set.get_var_data_type(VAR_I32_NAME));
-    /// assert_eq!(None,                data_set.get_var_i8(VAR_I32_NAME));
-    /// assert_eq!(None,                data_set.get_var_u8(VAR_I32_NAME));
-    /// assert_eq!(None,                data_set.get_var_i16(VAR_I32_NAME));
-    /// assert_eq!(Some(&DATA_I32[..]), data_set.get_var_i32(VAR_I32_NAME));
-    /// assert_eq!(None,                data_set.get_var_f32(VAR_I32_NAME));
-    /// assert_eq!(None,                data_set.get_var_f64(VAR_I32_NAME));
-    ///
-    /// ```
-    pub fn get_i8(&self) -> Option<&[i8]>
+    #[test]
+    fn test_var_chunk_size()
     {
-        match self.data {
-            Some(DataVector::I8(ref data)) => Some(data),
-            _ => None,
-        }
+
+        const DIM_NAME_1: &str = "dim_1";
+        const DIM_SIZE_1: usize = 1;
+        const DIM_NAME_2: &str = "dim_2";
+        const DIM_SIZE_2: usize = 2;
+        const DIM_NAME_4: &str = "dim_4";
+        const DIM_SIZE_4: usize = 4;
+        const DIM_NAME_5: &str = "dim_5";
+        const DIM_SIZE_5: usize = 5;
+
+        const VAR_I8_1_NAME: &str = "var_i8_1";
+        const VAR_I8_4_NAME: &str = "var_i8_4";
+        const VAR_I8_5_NAME: &str = "var_i8_5";
+        const VAR_I16_1_NAME: &str = "var_i16_1";
+        const VAR_I16_2_NAME: &str = "var_i16_2";
+        const VAR_I32_1_NAME: &str = "var_i32_1";
+
+        let data_set: DataSet = {
+            let mut data_set: DataSet = DataSet::new();
+            data_set.add_fixed_dim(DIM_NAME_1, DIM_SIZE_1).unwrap();
+            data_set.add_fixed_dim(DIM_NAME_2, DIM_SIZE_2).unwrap();
+            data_set.add_fixed_dim(DIM_NAME_4, DIM_SIZE_4).unwrap();
+            data_set.add_fixed_dim(DIM_NAME_5, DIM_SIZE_5).unwrap();
+
+            data_set.add_var_i8(VAR_I8_1_NAME, &[DIM_NAME_1]).unwrap();
+            data_set.add_var_i8(VAR_I8_4_NAME, &[DIM_NAME_4]).unwrap();
+            data_set.add_var_i8(VAR_I8_5_NAME, &[DIM_NAME_5]).unwrap();
+            data_set.add_var_i16(VAR_I16_1_NAME, &[DIM_NAME_1]).unwrap();
+            data_set.add_var_i16(VAR_I16_2_NAME, &[DIM_NAME_2]).unwrap();
+            data_set.add_var_i32(VAR_I32_1_NAME, &[DIM_NAME_1]).unwrap();
+
+            data_set
+        };
+
+        assert_eq!(true,    data_set.has_var(VAR_I8_1_NAME));
+        assert_eq!(true,    data_set.has_var(VAR_I8_4_NAME));
+        assert_eq!(true,    data_set.has_var(VAR_I8_5_NAME));
+        assert_eq!(true,    data_set.has_var(VAR_I16_1_NAME));
+        assert_eq!(true,    data_set.has_var(VAR_I16_2_NAME));
+        assert_eq!(true,    data_set.has_var(VAR_I32_1_NAME));
+
+        assert_eq!(4,       data_set.get_var(VAR_I8_1_NAME).unwrap().chunk_size());
+        assert_eq!(4,       data_set.get_var(VAR_I8_4_NAME).unwrap().chunk_size());
+        assert_eq!(8,       data_set.get_var(VAR_I8_5_NAME).unwrap().chunk_size());
+        assert_eq!(4,       data_set.get_var(VAR_I16_1_NAME).unwrap().chunk_size());
+        assert_eq!(4,       data_set.get_var(VAR_I16_2_NAME).unwrap().chunk_size());
+        assert_eq!(4,       data_set.get_var(VAR_I32_1_NAME).unwrap().chunk_size());
     }
 
-    /// Returns a reference to the `u8` data vector (refer to the method [get_i8](struct.Variable.html#method.get_i8)).
-    pub fn get_u8(&self) -> Option<&[u8]>
+    #[test]
+    fn test_var_len_per_chunk()
     {
-        match self.data {
-            Some(DataVector::U8(ref data)) => Some(data),
-            _ => None,
-        }
+        const UNLIM_DIM_NAME: &str = "unlim_dim";
+        const UNLIM_DIM_SIZE: usize = 30;
+
+        const FIXED_DIM_NAME_1: &str = "fixed_dim_1";
+        const FIXED_DIM_SIZE_1: usize = 10;
+        const FIXED_DIM_NAME_2: &str = "fixed_dim_2";
+        const FIXED_DIM_SIZE_2: usize = 20;
+
+        const VAR_NAME_1: &str = "var_1";
+        const VAR_NAME_2: &str = "var_2";
+
+        let data_set: DataSet = {
+            let mut data_set: DataSet = DataSet::new();
+            data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+            data_set.add_fixed_dim(FIXED_DIM_NAME_1, FIXED_DIM_SIZE_1).unwrap();
+            data_set.add_fixed_dim(FIXED_DIM_NAME_2, FIXED_DIM_SIZE_2).unwrap();
+
+            data_set.add_var_i8(VAR_NAME_1, &[UNLIM_DIM_NAME, FIXED_DIM_NAME_1, FIXED_DIM_NAME_2]).unwrap();
+            data_set.add_var_i8(VAR_NAME_2, &[FIXED_DIM_NAME_1, FIXED_DIM_NAME_2]).unwrap();
+            data_set
+        };
+
+        assert_eq!(true,                                                    data_set.has_var(VAR_NAME_1));
+        let var_1: &Variable = data_set.get_var(VAR_NAME_1).unwrap();
+        assert_eq!(UNLIM_DIM_SIZE * FIXED_DIM_SIZE_1 * FIXED_DIM_SIZE_2,    var_1.len());
+        assert_eq!(true,                                                    var_1.is_record_var());
+        assert_eq!(FIXED_DIM_SIZE_1 * FIXED_DIM_SIZE_2,                     var_1.chunk_len());
+
+        assert_eq!(true,                                                    data_set.has_var(VAR_NAME_2));
+        let var_2: &Variable = data_set.get_var(VAR_NAME_2).unwrap();
+        assert_eq!(FIXED_DIM_SIZE_1 * FIXED_DIM_SIZE_2,                     var_2.len());
+        assert_eq!(false,                                                   var_2.is_record_var());
+        assert_eq!(FIXED_DIM_SIZE_1 * FIXED_DIM_SIZE_2,                     var_2.chunk_len());
     }
-
-    /// Returns a reference to the `i16` data vector (refer to the method [get_i8](struct.Variable.html#method.get_i8)).
-    pub fn get_i16(&self) -> Option<&[i16]>
-    {
-        match self.data {
-            Some(DataVector::I16(ref data)) => Some(data),
-            _ => None,
-        }
-    }
-
-    /// Returns a reference to the `i32` data vector (refer to the method [get_i8](struct.Variable.html#method.get_i8)).
-    pub fn get_i32(&self) -> Option<&[i32]>
-    {
-        match self.data {
-            Some(DataVector::I32(ref data)) => Some(data),
-            _ => None,
-        }
-    }
-
-    /// Returns a reference to the `f32` data vector (refer to the method [get_i8](struct.Variable.html#method.get_i8)).
-    pub fn get_f32(&self) -> Option<&[f32]>
-    {
-        match self.data {
-            Some(DataVector::F32(ref data)) => Some(data),
-            _ => None,
-        }
-    }
-
-    /// Returns a reference to the `f64` data vector (refer to the method [get_i8](struct.Variable.html#method.get_i8)).
-    pub fn get_f64(&self) -> Option<&[f64]>
-    {
-        match self.data {
-            Some(DataVector::F64(ref data)) => Some(data),
-            _ => None,
-        }
-    }
-
-    /// Set `i8` data
-    ///
-    /// Returns an error if :
-    ///
-    ///  - The length of the data vector is not equal to the variable length.
-    ///  - The data type is not the same.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use netcdf3::{DataSet, DataType, InvalidDataSet};
-    ///
-    /// const DIM_NAME: &str = "dim_1";
-    ///
-    /// const VAR_I32_NAME: &str = "var_i8";
-    /// const DATA_I32: [i32; 3] = [1, 2, 3];
-    /// const DATA_I32_LEN: usize = DATA_I32.len();
-    ///
-    /// const DATA_F32: [f32; 3] = [1.0, 2.0, 3.0];
-    /// const DATA_F32_LEN: usize = DATA_F32.len();
-    ///
-    /// assert_eq!(DATA_I32_LEN, DATA_F32_LEN);
-    ///
-    /// // Create a new data set, one dimension, and one variable
-    /// let mut data_set = DataSet::new();
-    /// data_set.add_fixed_dim(DIM_NAME, DATA_I32_LEN).unwrap();
-    /// data_set.add_var_i32(VAR_I32_NAME, &[DIM_NAME]).unwrap();
-    ///
-    /// assert_eq!(1,                   data_set.num_vars());
-    /// assert_eq!(true,                data_set.has_var(VAR_I32_NAME));
-    /// assert_eq!(Some(DATA_I32_LEN),  data_set.get_var_len(VAR_I32_NAME));
-    /// assert_eq!(Some(DataType::I32), data_set.get_var_data_type(VAR_I32_NAME));
-    /// assert_eq!(None,                data_set.get_var_i32(VAR_I32_NAME));
-    ///
-    /// // Try to set a data vector with a wrong number of elements
-    /// assert_eq!(
-    ///     InvalidDataSet::VariableMismatchDataLength{
-    ///         var_name: String::from(VAR_I32_NAME),
-    ///         req: DATA_I32_LEN,
-    ///         get: DATA_I32_LEN - 1,
-    ///     },
-    ///     data_set.set_var_i32(VAR_I32_NAME, DATA_I32[0..(DATA_I32_LEN - 1)].to_vec()).unwrap_err()
-    /// );
-    ///
-    /// assert_eq!(1,                   data_set.num_vars());
-    /// assert_eq!(true,                data_set.has_var(VAR_I32_NAME));
-    /// assert_eq!(Some(DATA_I32_LEN),  data_set.get_var_len(VAR_I32_NAME));
-    /// assert_eq!(Some(DataType::I32), data_set.get_var_data_type(VAR_I32_NAME));
-    /// assert_eq!(None,                data_set.get_var_i32(VAR_I32_NAME));
-    ///
-    /// /// Try to set a data vector with a wrong datat type
-    /// assert_eq!(
-    ///     InvalidDataSet::VariableMismatchDataType{
-    ///         var_name: String::from(VAR_I32_NAME),
-    ///         req: DataType::I32,
-    ///         get: DataType::F32,
-    ///     },
-    ///     data_set.set_var_f32(VAR_I32_NAME, DATA_F32.to_vec()).unwrap_err()
-    /// );
-    ///
-    /// assert_eq!(1,                   data_set.num_vars());
-    /// assert_eq!(true,                data_set.has_var(VAR_I32_NAME));
-    /// assert_eq!(Some(DATA_I32_LEN),  data_set.get_var_len(VAR_I32_NAME));
-    /// assert_eq!(Some(DataType::I32), data_set.get_var_data_type(VAR_I32_NAME));
-    /// assert_eq!(None,                data_set.get_var_i32(VAR_I32_NAME));
-    ///
-    /// // Set a data vector with the valid number of elements and the valid data type
-    /// data_set.set_var_i32(VAR_I32_NAME, DATA_I32.to_vec()).unwrap();
-    ///
-    /// assert_eq!(1,                       data_set.num_vars());
-    /// assert_eq!(true,                    data_set.has_var(VAR_I32_NAME));
-    /// assert_eq!(Some(DATA_I32_LEN),      data_set.get_var_len(VAR_I32_NAME));
-    /// assert_eq!(Some(DataType::I32),     data_set.get_var_data_type(VAR_I32_NAME));
-    /// assert_eq!(Some(&DATA_I32[..]),    data_set.get_var_i32(VAR_I32_NAME));
-    /// ```
-    pub fn set_i8(&mut self, data: Vec<i8>) -> Result<(), InvalidDataSet>
-    {
-        // Check that the variable is a `i8` type variable
-        if self.data_type != DataType::I8 {
-            return Err(InvalidDataSet::VariableMismatchDataType{
-                var_name: self.name.to_string(),
-                req: self.data_type.clone(),
-                get: DataType::I8,
-            });
-        }
-
-        // Check that the variable has the same length the the input vector
-        let var_len: usize = self.len();
-        if var_len != data.len() {
-            return Err(InvalidDataSet::VariableMismatchDataLength{
-                var_name: self.name.to_string(),
-                req: var_len,
-                get: data.len()
-            });
-        }
-
-        // Set the data
-        self.data = Some(DataVector::I8(data));
-        Ok(())
-    }
-
-    /// Set `u8` data (refer to the method [set_i8](struct.Variable.html#method.set_i8)).
-    pub fn set_u8(&mut self, data: Vec<u8>) -> Result<(), InvalidDataSet>
-    {
-        // Check that the variable is a `u8` type variable
-        if self.data_type != DataType::U8 {
-            return Err(InvalidDataSet::VariableMismatchDataType{
-                var_name: self.name.to_string(),
-                req: self.data_type.clone(),
-                get: DataType::U8,
-            });
-        }
-
-        // Check that the variable has the same length the the input vector
-        let var_len: usize = self.len();
-        if var_len != data.len() {
-            return Err(InvalidDataSet::VariableMismatchDataLength{
-                var_name: self.name.to_string(),
-                req: var_len,
-                get: data.len()
-            });
-        }
-
-        // Set the data
-        self.data = Some(DataVector::U8(data));
-        Ok(())
-    }
-
-    /// Set `i16` data (refer to the method [set_i8](struct.Variable.html#method.set_i8)).
-    pub fn set_i16(&mut self, data: Vec<i16>) -> Result<(), InvalidDataSet>
-    {
-        // Check that the variable is a `i16` type variable
-        if self.data_type != DataType::I16 {
-            return Err(InvalidDataSet::VariableMismatchDataType{
-                var_name: self.name.to_string(),
-                req: self.data_type.clone(),
-                get: DataType::I16,
-            });
-        }
-
-        // Check that the variable has the same length the the input vector
-        let var_len: usize = self.len();
-        if var_len != data.len() {
-            return Err(InvalidDataSet::VariableMismatchDataLength{
-                var_name: self.name.to_string(),
-                req: var_len,
-                get: data.len()
-            });
-        }
-
-        // Set the data
-        self.data = Some(DataVector::I16(data));
-        Ok(())
-    }
-
-    /// Set `i32` data (refer to the method [set_i8](struct.Variable.html#method.set_i8)).
-    pub fn set_i32(&mut self, data: Vec<i32>) -> Result<(), InvalidDataSet>
-    {
-        // Check that the variable is a `i32` type variable
-        if self.data_type != DataType::I32 {
-            return Err(InvalidDataSet::VariableMismatchDataType{
-                var_name: self.name.to_string(),
-                req: self.data_type.clone(),
-                get: DataType::I32,
-            });
-        }
-
-        // Check that the variable has the same length the the input vector
-        let var_len: usize = self.len();
-        if var_len != data.len() {
-            return Err(InvalidDataSet::VariableMismatchDataLength{
-                var_name: self.name.to_string(),
-                req: var_len,
-                get: data.len()
-            });
-        }
-
-        // Set the data
-        self.data = Some(DataVector::I32(data));
-        Ok(())
-    }
-
-    /// Set `f32` data (refer to the method [set_i8](struct.Variable.html#method.set_i8)).
-    pub fn set_f32(&mut self, data: Vec<f32>) -> Result<(), InvalidDataSet>
-    {
-        // Check that the variable is a `f32` type variable
-        if self.data_type != DataType::F32 {
-            return Err(InvalidDataSet::VariableMismatchDataType{
-                var_name: self.name.to_string(),
-                req: self.data_type.clone(),
-                get: DataType::F32,
-            });
-        }
-
-        // Check that the variable has the same length the the input vector
-        let var_len: usize = self.len();
-        if var_len != data.len() {
-            return Err(InvalidDataSet::VariableMismatchDataLength{
-                var_name: self.name.to_string(),
-                req: var_len,
-                get: data.len()
-            });
-        }
-
-        // Set the data
-        self.data = Some(DataVector::F32(data));
-        Ok(())
-    }
-
-    /// Set `f64` data (refer to the method [set_i8](struct.Variable.html#method.set_i8)).
-    pub fn set_f64(&mut self, data: Vec<f64>) -> Result<(), InvalidDataSet>
-    {
-        // Check that the variable is a `f64` type variable
-        if self.data_type != DataType::F64 {
-            return Err(InvalidDataSet::VariableMismatchDataType{
-                var_name: self.name.to_string(),
-                req: self.data_type.clone(),
-                get: DataType::F64,
-            });
-        }
-
-        // Check that the variable has the same length the the input vector
-        let var_len: usize = self.len();
-        if var_len != data.len() {
-            return Err(InvalidDataSet::VariableMismatchDataLength{
-                var_name: self.name.to_string(),
-                req: var_len,
-                get: data.len()
-            });
-        }
-
-        // Set the data
-        self.data = Some(DataVector::F64(data));
-        Ok(())
-    }
-
 }
