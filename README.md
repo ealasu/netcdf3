@@ -1,6 +1,6 @@
 # netcdf3
 
-![LICENSE](https://img.shields.io/badge/license-MIT-blue.svg)
+![Crates.io](https://img.shields.io/crates/l/netcdf3)
 [![Documentation](https://docs.rs/netcdf3/badge.svg)](https://docs.rs/netcdf3)
 [![Build Status](https://travis-ci.com/julienbonte/netcdf3.svg?branch=master)](https://travis-ci.com/julienbonte/netcdf3)
 [![Crates.io Version](https://img.shields.io/crates/v/netcdf3.svg)](https://crates.io/crates/netcdf3)
@@ -12,7 +12,7 @@ A pure Rust library for reading and writing NetCDF-3 files.
 
 ## Technical features
 
-- [X] Read the classic and 64-bit offset NetCDF-3 file :
+- [X] Read the classic and 64-bit offset NetCDF-3 files :
     - [X] Open the files and parse the headers.
     - [X] Read the variables data from a file.
     - [X] Read the attribute `u8` values as UTF-8 string.
