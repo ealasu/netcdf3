@@ -548,9 +548,9 @@ impl DataSet {
         Ok(())
     }
 
-    pub(crate) fn add_var_using_dim_refs(&mut self, var_name: &str, var_dims: Vec<Rc<Dimension>>, data_type: DataType) -> Result<(), InvalidDataSet> {
+    pub(crate) fn add_var_using_dim_refs(&mut self, var_name: &str, var_dims: Vec<Rc<Dimension>>, data_type: DataType) -> Result<&Variable, InvalidDataSet> {
         let _ = self.vars.push(Variable::new(var_name, var_dims, data_type)?);
-        Ok(())
+        Ok(self.vars.last().unwrap())
     }
 
     /// Add a new `i8` type variable  defined over named dimensions (see the [add_var](struct.DataSet.html#method.add_var) method).

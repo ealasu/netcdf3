@@ -32,7 +32,7 @@ use crate::{
 /// ```
 /// use std::path::PathBuf;
 /// use std::io::Read;
-/// use copy_to_tmp_file::NC3_BASIC_CLASSIC_FILE_BYTES;
+/// use copy_to_tmp_file::NC3_LIGHT_CLASSIC_FILE_BYTES;
 /// # use tempdir::TempDir;
 ///
 /// use netcdf3::{FileWriter, DataSet, Version};
@@ -96,8 +96,8 @@ use crate::{
 ///     written_bytes
 /// };
 /// # tmp_dir.close().unwrap();
-/// assert_eq!(NC3_BASIC_CLASSIC_FILE_BYTES.len(),   nc3_file_bytes.len());
-/// assert_eq!(NC3_BASIC_CLASSIC_FILE_BYTES,         &nc3_file_bytes[..]);
+/// assert_eq!(NC3_LIGHT_CLASSIC_FILE_BYTES.len(),   nc3_file_bytes.len());
+/// assert_eq!(NC3_LIGHT_CLASSIC_FILE_BYTES,         &nc3_file_bytes[..]);
 /// ```
 #[derive(Debug)]
 pub struct FileWriter<'a> {
@@ -486,10 +486,18 @@ impl<'a> FileWriter<'a> {
         //the version number
         num_bytes += self.output_file.write(&[header_def.version.clone() as u8])?;
         // the size of the *unlimited-size* dimension
-        let unlim_dim_size: usize = header_def.data_set.unlimited_dim.as_ref()
-            .map(|unlim_dim: &Rc<Dimension>| unlim_dim.size())
-            .unwrap_or(0);
-        let bytes: [u8; 4] = (unlim_dim_size as i32).to_be_bytes();
+        let num_records: u32 = match header_def.data_set.unlimited_dim.as_ref() {
+            None => 0,  // No unlimited-size dim is defined
+            Some(unlim_dim) => {
+                let num_records: usize = unlim_dim.size();
+                if num_records <= (std::i32::MAX as usize) {
+                    num_records as u32
+                } else {
+                    std::u32::MAX  // indeterminate numbe of records records
+                }
+            }
+        };
+        let bytes: [u8; 4] = num_records.to_be_bytes();
         num_bytes += self.output_file.write(&bytes)?;
         // the list of the dimensions
         num_bytes += FileWriter::write_dims_list(&mut self.output_file, &header_def.data_set.dims)?;
@@ -861,7 +869,13 @@ impl<'a> FileWriter<'a> {
             // Write the variable data type
             num_bytes += FileWriter::write_data_type(out_stream, var.data_type.clone())?;
             // Write the `var_size` the number of bytes used per chunk (including the zero padding bytes)
-            bytes = (var_metadata.chunk_size as i32).to_be_bytes();
+            bytes = {
+                let mut chunk_size: usize = var_metadata.chunk_size;
+                if chunk_size > (std::i32::MAX as usize) {
+                    chunk_size = std::u32::MAX as usize;
+                }
+                (chunk_size as u32).to_be_bytes()
+            };
             num_bytes += out_stream.write(&bytes)?;
             // Write the `begin_offset`
             match var_metadata.begin_offset {

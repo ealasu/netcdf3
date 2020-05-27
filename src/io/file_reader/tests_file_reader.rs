@@ -1,9 +1,8 @@
 #![cfg(test)]
-
 use byteorder::{WriteBytesExt, BigEndian};
 
 use crate::{
-    FileReader, DataSet, DataType,
+    FileReader, DataSet, DataType, DimensionType,
     error::ReadError,
     error::parse_header_error::{ParseHeaderError, ParseHeaderErrorKind, InvalidBytes},
     io::compute_padding_size,
@@ -12,6 +11,9 @@ use crate::{
 use copy_to_tmp_file::{
     copy_bytes_to_tmp_file,
     NC3_CLASSIC_FILE_NAME, NC3_CLASSIC_FILE_BYTES,
+    SCALAR_VARIABLES_FILE_NAME, SCALAR_VARIABLES_FILE_BYTES,
+    EMPTY_DATA_SET_FILE_NAME, EMPTY_DATA_SET_FILE_BYTES,
+    NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME, NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_BYTES,
 };
 
 const TEMP_I8_VAR_NAME: &str = "temperature_i8";
@@ -36,17 +38,17 @@ const TEMP_F64_VAR_DATA: [f64; 30] = [0., 1., 2., 3., 4., 5., 6., 7., 8., 9., 10
 #[test]
 fn test_file_reader_read_var_to_i8() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
-
+    
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
-
+    
     {
         let data_set: &DataSet = file_reader.data_set();
         assert_eq!(true,                            data_set.has_var(TEMP_I8_VAR_NAME));
         assert_eq!(Some(DataType::I8),              data_set.var_data_type(TEMP_I8_VAR_NAME));
     }
-
+    
     assert_eq!(Ok(TEMP_I8_VAR_DATA.to_vec()), file_reader.read_var_to_i8(TEMP_I8_VAR_NAME));
-
+    
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::I8},
         file_reader.read_var_to_i8(TEMP_U8_VAR_NAME).unwrap_err()
@@ -71,10 +73,10 @@ fn test_file_reader_read_var_to_i8() {
         ReadError::VariableNotDefined(String::from("undef_var")),
         file_reader.read_var_to_u8("undef_var").unwrap_err()
     );
-
+    
     let data_set: DataSet = file_reader.close().0;
     tmp_dir.close().unwrap();
-
+    
     assert_eq!(true,                            data_set.has_var(TEMP_U8_VAR_NAME));
     assert_eq!(Some(DataType::U8),              data_set.var_data_type(TEMP_U8_VAR_NAME));
 }
@@ -82,17 +84,17 @@ fn test_file_reader_read_var_to_i8() {
 #[test]
 fn test_file_reader_read_var_to_u8() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
-
+    
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
-
+    
     {
         let data_set: &DataSet = file_reader.data_set();
         assert_eq!(true,                            data_set.has_var(TEMP_U8_VAR_NAME));
         assert_eq!(Some(DataType::U8),              data_set.var_data_type(TEMP_U8_VAR_NAME));
     }
-
+    
     assert_eq!(Ok(TEMP_U8_VAR_DATA.to_vec()), file_reader.read_var_to_u8(TEMP_U8_VAR_NAME));
-
+    
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::U8},
         file_reader.read_var_to_u8(TEMP_I8_VAR_NAME).unwrap_err()
@@ -117,10 +119,10 @@ fn test_file_reader_read_var_to_u8() {
         ReadError::VariableNotDefined(String::from("undef_var")),
         file_reader.read_var_to_u8("undef_var").unwrap_err()
     );
-
+    
     let data_set: DataSet = file_reader.close().0;
     tmp_dir.close().unwrap();
-
+    
     assert_eq!(true,                            data_set.has_var(TEMP_U8_VAR_NAME));
     assert_eq!(Some(DataType::U8),              data_set.var_data_type(TEMP_U8_VAR_NAME));
 }
@@ -128,17 +130,17 @@ fn test_file_reader_read_var_to_u8() {
 #[test]
 fn test_file_reader_read_var_to_i16() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
-
+    
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
-
+    
     {
         let data_set: &DataSet = file_reader.data_set();
         assert_eq!(true,                            data_set.has_var(TEMP_I16_VAR_NAME));
         assert_eq!(Some(DataType::I16),             data_set.var_data_type(TEMP_I16_VAR_NAME));
     }
-
+    
     assert_eq!(Ok(TEMP_I16_VAR_DATA.to_vec()),      file_reader.read_var_to_i16(TEMP_I16_VAR_NAME));
-
+    
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::I16},
         file_reader.read_var_to_i16(TEMP_I8_VAR_NAME).unwrap_err()
@@ -163,7 +165,7 @@ fn test_file_reader_read_var_to_i16() {
         ReadError::VariableNotDefined(String::from("undef_var")),
         file_reader.read_var_to_i16("undef_var").unwrap_err()
     );
-
+    
     let data_set: DataSet = file_reader.close().0;
     tmp_dir.close().unwrap();
     assert_eq!(true,                            data_set.has_var(TEMP_I16_VAR_NAME));
@@ -173,17 +175,17 @@ fn test_file_reader_read_var_to_i16() {
 #[test]
 fn test_file_reader_read_var_to_i32() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
-
+    
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
-
+    
     {
         let data_set: &DataSet = file_reader.data_set();
         assert_eq!(true,                            data_set.has_var(TEMP_I32_VAR_NAME));
         assert_eq!(Some(DataType::I32),             data_set.var_data_type(TEMP_I32_VAR_NAME));
     }
-
+    
     assert_eq!(Ok(TEMP_I32_VAR_DATA.to_vec()),      file_reader.read_var_to_i32(TEMP_I32_VAR_NAME));
-
+    
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::I32},
         file_reader.read_var_to_i32(TEMP_I8_VAR_NAME).unwrap_err()
@@ -208,7 +210,7 @@ fn test_file_reader_read_var_to_i32() {
         ReadError::VariableNotDefined(String::from("undef_var")),
         file_reader.read_var_to_i32("undef_var").unwrap_err()
     );
-
+    
     let data_set: DataSet = file_reader.close().0;
     tmp_dir.close().unwrap();
     assert_eq!(true,                            data_set.has_var(TEMP_I32_VAR_NAME));
@@ -218,17 +220,17 @@ fn test_file_reader_read_var_to_i32() {
 #[test]
 fn test_file_reader_read_var_to_f32() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
-
+    
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
-
+    
     {
         let data_set: &DataSet = file_reader.data_set();
         assert_eq!(true,                            data_set.has_var(TEMP_F32_VAR_NAME));
         assert_eq!(Some(DataType::F32),             data_set.var_data_type(TEMP_F32_VAR_NAME));
     }
-
+    
     assert_eq!(Ok(TEMP_F32_VAR_DATA.to_vec()),      file_reader.read_var_to_f32(TEMP_F32_VAR_NAME));
-
+    
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::F32},
         file_reader.read_var_to_f32(TEMP_I8_VAR_NAME).unwrap_err()
@@ -253,7 +255,7 @@ fn test_file_reader_read_var_to_f32() {
         ReadError::VariableNotDefined(String::from("undef_var")),
         file_reader.read_var_to_f32("undef_var").unwrap_err()
     );
-
+    
     let data_set: DataSet = file_reader.close().0;
     tmp_dir.close().unwrap();
     assert_eq!(true,                            data_set.has_var(TEMP_F32_VAR_NAME));
@@ -263,17 +265,17 @@ fn test_file_reader_read_var_to_f32() {
 #[test]
 fn test_file_reader_read_var_to_f64() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
-
+    
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
-
+    
     {
         let data_set: &DataSet = file_reader.data_set();
         assert_eq!(true,                            data_set.has_var(TEMP_F64_VAR_NAME));
         assert_eq!(Some(DataType::F64),             data_set.var_data_type(TEMP_F64_VAR_NAME));
     }
-
+    
     assert_eq!(Ok(TEMP_F64_VAR_DATA.to_vec()),      file_reader.read_var_to_f64(TEMP_F64_VAR_NAME));
-
+    
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::F64},
         file_reader.read_var_to_f64(TEMP_I8_VAR_NAME).unwrap_err()
@@ -298,7 +300,7 @@ fn test_file_reader_read_var_to_f64() {
         ReadError::VariableNotDefined(String::from("undef_var")),
         file_reader.read_var_to_f64("undef_var").unwrap_err()
     );
-
+    
     let data_set: DataSet = file_reader.close().0;
     tmp_dir.close().unwrap();
     assert_eq!(true,                            data_set.has_var(TEMP_F64_VAR_NAME));
@@ -317,7 +319,7 @@ fn test_parse_non_neg_i32() {
         assert_eq!(&[] as &[u8], rem_bytes);
         assert_eq!(0_i32, b);
     }
-
+    
     // Test `1_i32`
     {
         let a: i32 = 1_i32;
@@ -328,7 +330,7 @@ fn test_parse_non_neg_i32() {
         assert_eq!(&[] as &[u8], rem_bytes);
         assert_eq!(1_i32, b);
     }
-
+    
     // Test `std::i32::MAX`
     {
         let a: i32 = std::i32::MAX;
@@ -339,7 +341,7 @@ fn test_parse_non_neg_i32() {
         assert_eq!(&[] as &[u8], rem_bytes);
         assert_eq!(std::i32::MAX, b);
     }
-
+    
     // Test `-1_i32`
     {
         let a: i32 = -1_i32;
@@ -348,18 +350,15 @@ fn test_parse_non_neg_i32() {
         let parsing_result = FileReader::parse_non_neg_i32(&bytes[..]);
         // check the returned error
         assert!(parsing_result.is_err());
-        let parsing_result = FileReader::parse_non_neg_i32(&bytes[..]);
-        assert!(parsing_result.is_err());
-        assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
-        assert!(!parsing_err.is_incomplete());
+        assert_eq!(false,  parsing_err.is_incomplete());
         assert_eq!(ParseHeaderErrorKind::NonNegativeI32 ,parsing_err.kind);
         assert_eq!(
             InvalidBytes::Bytes(bytes.to_vec()),
             parsing_err.invalid_bytes,
         );
     }
-
+    
     // Test `std::i32::MIN`
     {
         let a: i32 = std::i32::MIN;
@@ -369,14 +368,14 @@ fn test_parse_non_neg_i32() {
         // check the returned error
         assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
-        assert!(!parsing_err.is_incomplete());
+        assert_eq!(false,  parsing_err.is_incomplete());
         assert_eq!(ParseHeaderErrorKind::NonNegativeI32 ,parsing_err.kind);
         assert_eq!(
             InvalidBytes::Bytes(bytes.to_vec()),
             parsing_err.invalid_bytes,
         );
     }
-
+    
     // Test with a larger input
     {
         let a: i32 = 1_i32;
@@ -392,7 +391,7 @@ fn test_parse_non_neg_i32() {
         assert_eq!(&[42, 43, 44], rem_bytes);
         assert_eq!(1_i32, b);
     }
-
+    
     // Missing input bytes
     {
         let a: i32 = 1_i32;
@@ -400,7 +399,6 @@ fn test_parse_non_neg_i32() {
         assert_eq!(2, bytes.len());
         // check the returned error
         let parsing_result = FileReader::parse_non_neg_i32(&bytes[..]);
-        assert!(parsing_result.is_err());
         assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
         assert!(parsing_err.is_incomplete());
@@ -413,13 +411,106 @@ fn test_parse_non_neg_i32() {
 }
 
 #[test]
+fn test_parse_num_records() {
+    // Test the indeterminated valud `std::u32::MAX`
+    {
+        let a: u32 = std::u32::MAX;
+        let bytes: [u8; 4] = a.to_be_bytes();
+        // parse the integer
+        let (rem_bytes, b): (&[u8], Option<usize>) = FileReader::parse_as_usize_optional(&bytes[..]).unwrap();
+        // test remaining bytes and the parsed value
+        assert_eq!(&[] as &[u8],                    rem_bytes);
+        assert_eq!(None,                            b);
+    }
+    
+    // Test `0`
+    {
+        let a: u32 = 0_u32;
+        let bytes: [u8; 4] = a.to_be_bytes();
+        // parse the integer
+        let (rem_bytes, b): (&[u8],Option<usize>) = FileReader::parse_as_usize_optional(&bytes[..]).unwrap();
+        // test remaining bytes and the parsed value
+        assert_eq!(&[] as &[u8],                rem_bytes);
+        assert_eq!(Some(0),                     b);
+    }
+    
+    // Test `1_u32`
+    {
+        let a: u32 = 1_u32;
+        let bytes: [u8; 4] = a.to_be_bytes();
+        // parse the integer
+        let (rem_bytes, b): (&[u8],Option<usize>) = FileReader::parse_as_usize_optional(&bytes[..]).unwrap();
+        // test remaining bytes and the parsed value
+        assert_eq!(&[] as &[u8],                rem_bytes);
+        assert_eq!(Some(1),                     b);
+    }
+    
+    // Test `std::i32::MAX`
+    {
+        let a: u32 = std::i32::MAX as u32;
+        let bytes: [u8; 4] = a.to_be_bytes();
+        // parse the integer
+        let (rem_bytes, b): (&[u8], Option<usize>) = FileReader::parse_as_usize_optional(&bytes[..]).unwrap();
+        // test remaining bytes and the parsed value
+        assert_eq!(&[] as &[u8],                    rem_bytes);
+        assert_eq!(Some(std::i32::MAX as usize),    b);
+    }
+    
+    // Test `std::i32::MIN`
+    {
+        let a: i32 = std::i32::MIN;
+        let bytes: [u8; 4] = a.to_be_bytes();
+        // parse the integer
+        let parsing_result = FileReader::parse_as_usize_optional(&bytes[..]);
+        // check the returned error
+        assert_eq!(true,                                        parsing_result.is_err());
+        let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
+        assert_eq!(false,                                   parsing_err.is_incomplete());
+        assert_eq!(ParseHeaderErrorKind::NonNegativeI32,   parsing_err.kind);
+        assert_eq!(
+            InvalidBytes::Bytes(bytes.to_vec()),
+            parsing_err.invalid_bytes,
+        );
+    }
+    
+    // Test with a larger input
+    {
+        let a: u32 = (std::i32::MIN as u32) + 1;
+        let bytes: [u8; 4] = a.to_be_bytes();
+        // parse the integer
+        let parsing_result = FileReader::parse_as_usize_optional(&bytes[..]);
+        // check the returned error
+        assert_eq!(true,                                        parsing_result.is_err());
+        let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
+        assert_eq!(false,                                       parsing_err.is_incomplete());
+        assert_eq!(ParseHeaderErrorKind::NonNegativeI32,        parsing_err.kind);
+        assert_eq!(InvalidBytes::Bytes(bytes.to_vec()),         parsing_err.invalid_bytes);
+    }
+    
+    // Missing input bytes
+    {
+        let a: u32 = 0_u32;
+        let bytes: Vec<u8> = Vec::from(&a.to_be_bytes()[0..3]);
+        // parse the integer
+        // parse the integer
+        let parsing_result = FileReader::parse_as_usize_optional(&bytes[..]);
+        // check the returned error
+        assert!(parsing_result.is_err());
+        let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
+        assert_eq!(true,                                                parsing_err.is_incomplete());
+        assert_eq!(ParseHeaderErrorKind::NonNegativeI32,                parsing_err.kind);
+        assert_eq!(InvalidBytes::Incomplete(nom::Needed::Size(4)),      parsing_err.invalid_bytes);
+    }
+}
+
+#[test]
 fn test_parse_name_string() {
     {
         // Test a ASCII word
         {
             let bytes: Vec<u8> = {
                 let word : String = String::from("foo");
-
+                
                 // Write the name
                 let mut bytes: Vec<u8> = vec![];
                 let num_of_bytes = word.len();
@@ -431,7 +522,7 @@ fn test_parse_name_string() {
                 {
                     bytes.push(0_u8);
                 }
-
+                
                 bytes
             };
             // Parse the bytes into a string
@@ -441,12 +532,12 @@ fn test_parse_name_string() {
             // And test the remaining bytes
             assert_eq!(0, rem_bytes.len());
         }
-
+        
         // Test a ASCII word extended by other bytes
         {
             let bytes: Vec<u8> = {
                 let word : String = String::from("foo");
-
+                
                 // Write the name
                 let mut bytes: Vec<u8> = vec![];
                 let num_of_bytes = word.len();
@@ -460,7 +551,7 @@ fn test_parse_name_string() {
                 }
                 // Append other bytes
                 bytes.extend(&[1, 2, 3]);
-
+                
                 bytes
             };
             // Parse the bytes into a string
@@ -470,12 +561,12 @@ fn test_parse_name_string() {
             // And test the remaining bytes
             assert_eq!(&[1, 2, 3], rem_bytes);
         }
-
+        
         // Test with a wrong zero-padding bytes
         {
             let bytes: Vec<u8> = {
                 let word : String = String::from("foooo");
-
+                
                 // Write the name
                 let mut bytes: Vec<u8> = vec![];
                 let num_of_bytes = word.len();
@@ -500,16 +591,16 @@ fn test_parse_name_string() {
             let parsing_result = FileReader::parse_name_string(&bytes[..]);
             assert!(parsing_result.is_err());
             let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
-            assert!(!parsing_err.is_incomplete());
-            assert_eq!(ParseHeaderErrorKind::ZeroPadding ,parsing_err.kind);
-            assert_eq!(InvalidBytes::Bytes(vec![1, 0, 0]) ,parsing_err.invalid_bytes);
+            assert_eq!(false,                               parsing_err.is_incomplete());
+            assert_eq!(ParseHeaderErrorKind::ZeroPadding,   parsing_err.kind);
+            assert_eq!(InvalidBytes::Bytes(vec![1, 0, 0]),  parsing_err.invalid_bytes);
         }
-
+        
         // Test a valid UTF-8 word
         {
             let bytes: Vec<u8> = {
                 let word : String = String::from("café");
-
+                
                 // Write the name
                 let mut bytes: Vec<u8> = vec![];
                 let num_of_bytes = word.len();
@@ -521,7 +612,7 @@ fn test_parse_name_string() {
                 {
                     bytes.push(0_u8);
                 }
-
+                
                 bytes
             };
             // Parse the bytes into a string
@@ -531,13 +622,13 @@ fn test_parse_name_string() {
             // And test the remaining bytes
             assert_eq!(0, rem_bytes.len());
         }
-
-
+        
+        
         // Test a latin-1 word (not valid UTF-8)
         {
             let bytes: Vec<u8> = {
                 let word : Vec<u8> = vec![b'c', b'a', b'f', b'\xe9'];  // latin-1 encoding
-
+                
                 // Write the name
                 let mut bytes: Vec<u8> = vec![];
                 let num_of_bytes = word.len();
@@ -549,7 +640,7 @@ fn test_parse_name_string() {
                 {
                     bytes.push(0_u8);
                 }
-
+                
                 bytes
             };
             // Parse the bytes into a string
@@ -558,19 +649,19 @@ fn test_parse_name_string() {
             assert!(parsing_result.is_err());
             assert!(parsing_result.is_err());
             let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
-            assert!(!parsing_err.is_incomplete());
+            assert_eq!(false,  parsing_err.is_incomplete());
             assert_eq!(ParseHeaderErrorKind::Utf8 ,parsing_err.kind);
             assert_eq!(
                 InvalidBytes::Bytes(vec![b'c', b'a', b'f', b'\xe9']),
                 parsing_err.invalid_bytes,
             );
         }
-
+        
         // Test missing zero padding bytes
         {
             let bytes: Vec<u8> = {
                 let word : String = String::from("foobar");
-
+                
                 // Write the name
                 let mut bytes: Vec<u8> = vec![];
                 let num_of_bytes = word.len();
@@ -585,7 +676,7 @@ fn test_parse_name_string() {
                 // remove the last byte
                 assert!(bytes.len() >= 2);
                 bytes.remove(bytes.len() - 1);
-
+                
                 bytes
             };
             // Parse the bytes into a string
@@ -607,7 +698,7 @@ fn test_parse_name_string() {
 #[test]
 fn test_parse_data_type() {
     use std::convert::TryFrom;
-
+    
     // test parse `DataType::I8`
     {
         let a: u32 = DataType::I8 as u32;
@@ -616,7 +707,7 @@ fn test_parse_data_type() {
         assert_eq!(DataType::I8, data_type);
         assert_eq!(&[] as &[u8], rem_input);
     }
-
+    
     // test parse `DataType::U8`
     {
         let a: u32 = DataType::U8 as u32;
@@ -625,7 +716,7 @@ fn test_parse_data_type() {
         assert_eq!(DataType::U8, data_type);
         assert_eq!(&[] as &[u8], rem_input);
     }
-
+    
     // // test parse `DataType::I16`
     {
         let a: u32 = DataType::I16 as u32;
@@ -634,7 +725,7 @@ fn test_parse_data_type() {
         assert_eq!(DataType::I16, data_type);
         assert_eq!(&[] as &[u8], rem_input);
     }
-
+    
     // // test parse `DataType::I32`
     {
         let a: u32 = DataType::I32 as u32;
@@ -643,7 +734,7 @@ fn test_parse_data_type() {
         assert_eq!(DataType::I32, data_type);
         assert_eq!(&[] as &[u8], rem_input);
     }
-
+    
     // // test parse `DataType::F32`
     {
         let a: u32 = DataType::F32 as u32;
@@ -652,7 +743,7 @@ fn test_parse_data_type() {
         assert_eq!(DataType::F32, data_type);
         assert_eq!(&[] as &[u8], rem_input);
     }
-
+    
     // test parse `DataType::F64`
     {
         let a: u32 = DataType::F64 as u32;
@@ -661,43 +752,43 @@ fn test_parse_data_type() {
         assert_eq!(DataType::F64, data_type);
         assert_eq!(&[] as &[u8], rem_input);
     }
-
+    
     // test parse a non-existant `DataType`
     {
         let a: u32 = 0_u32;
         assert!(DataType::try_from(a).is_err());
-
+        
         let bytes: [u8; 4] = a.to_be_bytes();
         let parsing_result = FileReader::parse_data_type(&bytes[..]);
         assert!(parsing_result.is_err());
     }
-
+    
     // test parse a negative `DataType` number
     {
         let a: i32 = -1_i32;
-
+        
         let bytes: [u8; 4] = a.to_be_bytes();
         let parsing_result = FileReader::parse_data_type(&bytes[..]);
         // Check the return error
         assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
-        assert!(!parsing_err.is_incomplete());
+        assert_eq!(false,  parsing_err.is_incomplete());
         assert_eq!(ParseHeaderErrorKind::NonNegativeI32, parsing_err.kind);
         assert_eq!(
             InvalidBytes::Bytes(bytes.to_vec()),
             parsing_err.invalid_bytes
         );
     }
-
+    
     // check the remaining bytes
     {
         let a: u32 = DataType::F64 as u32;
-
+        
         let mut bytes: Vec<u8> = Vec::from(&a.to_be_bytes()[..]);
         bytes.push(42);
         bytes.push(43);
         bytes.push(44);
-
+        
         let (rem_input, data_type): (&[u8], DataType) = FileReader::parse_data_type(&bytes[..]).unwrap();
         assert_eq!(DataType::F64, data_type);
         assert_eq!(
@@ -705,7 +796,7 @@ fn test_parse_data_type() {
             rem_input
         );
     }
-
+    
     // test missing input bytes
     {
         let a: u32 = DataType::F64 as u32;
@@ -732,7 +823,7 @@ fn test_parse_zero_padding() {
         let (rem_input, zero_padding): (&[u8], &[u8]) = FileReader::parse_zero_padding(&bytes, 3).unwrap();
         assert_eq!(0, rem_input.len());
         assert_eq!(&[0, 0, 0], zero_padding);
-
+        
     }
     // Test not valid zero padding
     {
@@ -741,7 +832,7 @@ fn test_parse_zero_padding() {
         // Check the return error
         assert!(parsing_result.is_err());
         let parsing_err = parsing_result.unwrap_err();
-        assert!(!parsing_err.is_incomplete());
+        assert_eq!(false,  parsing_err.is_incomplete());
         assert_eq!(
             ParseHeaderErrorKind::ZeroPadding,
             parsing_err.kind,
@@ -767,5 +858,189 @@ fn test_parse_zero_padding() {
             InvalidBytes::Incomplete(nom::Needed::Size(3)),
             parsing_err.invalid_bytes
         );
+    }
+}
+
+#[test]
+fn test_read_indeterminated_num_records() {
+    // Test a NetCDF-3 file which has an unlimited-size
+    // ------------------------------------------------
+    {
+        const UNLIM_DIM_NAME: &str = "time";
+        const UNLIM_DIM_SIZE: usize = 2;
+        
+        // 1: Read a data set where in which the `num_records` is defined
+        let original_dataset: DataSet = {
+            let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
+            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let data_set: DataSet = file_reader.close().0;
+            tmp_dir.close().unwrap();
+            data_set
+        };
+        
+        // 2. Change the input file bytes (set indeterminated the `num_records`) and read it as a NetCDF-3 data set
+        let modified_dataset: DataSet = {
+            let modified_bytes: Vec<u8> = {
+                // the indeterminate value is (2^32 - 1), see the file format specifications (https://www.unidata.ucar.edu/software/netcdf/docs/file_format_specifications.html)
+                let indeterminated_value_as_bytes: [u8; 4] = std::u32::MAX.to_be_bytes();
+                let mut bytes: Vec<u8> = NC3_CLASSIC_FILE_BYTES.to_vec();
+                bytes[4..8].copy_from_slice(&indeterminated_value_as_bytes);
+                bytes
+            };
+            let (tmp_dir, input_file_path) =  copy_bytes_to_tmp_file(&modified_bytes[..], NC3_CLASSIC_FILE_NAME);
+            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let data_set: DataSet = file_reader.close().0;
+            tmp_dir.close().unwrap();
+            data_set
+        };
+        
+        // 3. Compare the unlimited-size dimensions of the 2 datasets
+        assert_eq!(true,                                                original_dataset.has_unlimited_dim());
+        {
+            let unlim_dim = original_dataset.get_unlimited_dim().unwrap();
+            assert_eq!(UNLIM_DIM_NAME,                                  unlim_dim.name());
+            assert_eq!(UNLIM_DIM_SIZE,                                  unlim_dim.size());
+            assert_eq!(false,                                           unlim_dim.is_fixed());
+            assert_eq!(true,                                            unlim_dim.is_unlimited());
+            assert_eq!(DimensionType::UnlimitedSize,                    unlim_dim.dim_type());
+        }
+        
+        assert_eq!(true,                                                modified_dataset.has_unlimited_dim());
+        {
+            let unlim_dim = modified_dataset.get_unlimited_dim().unwrap();
+            assert_eq!(UNLIM_DIM_NAME,                                  unlim_dim.name());
+            assert_eq!(UNLIM_DIM_SIZE,                                  unlim_dim.size());
+            assert_eq!(false,                                           unlim_dim.is_fixed());
+            assert_eq!(true,                                            unlim_dim.is_unlimited());
+            assert_eq!(DimensionType::UnlimitedSize,                    unlim_dim.dim_type());
+        }
+        
+        assert_eq!(original_dataset.record_size(),                      modified_dataset.record_size());
+        assert_eq!(original_dataset.num_records(),                      modified_dataset.num_records());
+    }
+    
+    // Test a NetCDF-3 file which has not a unlimited-size dim but in which the number of records is indeterminated
+    {
+        // 1: Read a data set where in which the `num_records` is defined
+        let original_dataset: DataSet = {
+            let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(SCALAR_VARIABLES_FILE_BYTES, SCALAR_VARIABLES_FILE_NAME);
+            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let data_set: DataSet = file_reader.close().0;
+            tmp_dir.close().unwrap();
+            data_set
+        };
+        
+        // 2. Change the input file bytes (set indeterminated the `num_records`) and read it as a NetCDF-3 data set
+        let modified_dataset: DataSet = {
+            let modified_bytes: Vec<u8> = {
+                // the indeterminate value is (2^32 - 1), see the file format specifications (https://www.unidata.ucar.edu/software/netcdf/docs/file_format_specifications.html)
+                let indeterminated_value_as_bytes: [u8; 4] = std::u32::MAX.to_be_bytes();
+                let mut bytes: Vec<u8> = SCALAR_VARIABLES_FILE_BYTES.to_vec();
+                bytes[4..8].copy_from_slice(&indeterminated_value_as_bytes);
+                bytes
+            };
+            let (tmp_dir, input_file_path) =  copy_bytes_to_tmp_file(&modified_bytes[..], SCALAR_VARIABLES_FILE_NAME);
+            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let data_set: DataSet = file_reader.close().0;
+            tmp_dir.close().unwrap();
+            data_set
+        };
+        
+        // 3. Compare the unlimited-size dimensions of the 2 datasets
+        assert_eq!(false,                                               original_dataset.has_unlimited_dim());
+        assert_eq!(false,                                               modified_dataset.has_unlimited_dim());
+        
+        assert_eq!(original_dataset.record_size(),                      modified_dataset.record_size());
+        assert_eq!(original_dataset.num_records(),                      modified_dataset.num_records())
+    }
+    
+    // Test an empty data set NetCDF-3 file which has not a unlimited-size dim but in which the number of records is indeterminated
+    {
+        // 1: Read a data set where in which the `num_records` is defined
+        let original_dataset: DataSet = {
+            let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(EMPTY_DATA_SET_FILE_BYTES, EMPTY_DATA_SET_FILE_NAME);
+            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let data_set: DataSet = file_reader.close().0;
+            tmp_dir.close().unwrap();
+            data_set
+        };
+        
+        // 2. Change the input file bytes (set indeterminated the `num_records`) and read it as a NetCDF-3 data set
+        let modified_dataset: DataSet = {
+            let modified_bytes: Vec<u8> = {
+                // the indeterminate value is (2^32 - 1), see the file format specifications (https://www.unidata.ucar.edu/software/netcdf/docs/file_format_specifications.html)
+                let indeterminated_value_as_bytes: [u8; 4] = std::u32::MAX.to_be_bytes();
+                let mut bytes: Vec<u8> = EMPTY_DATA_SET_FILE_BYTES.to_vec();
+                bytes[4..8].copy_from_slice(&indeterminated_value_as_bytes);
+                bytes
+            };
+            let (tmp_dir, input_file_path) =  copy_bytes_to_tmp_file(&modified_bytes[..], EMPTY_DATA_SET_FILE_NAME);
+            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let data_set: DataSet = file_reader.close().0;
+            tmp_dir.close().unwrap();
+            data_set
+        };
+        
+        // 3. Compare the unlimited-size dimensions of the 2 datasets
+        assert_eq!(false,                                               original_dataset.has_unlimited_dim());
+        assert_eq!(false,                                               modified_dataset.has_unlimited_dim());
+        
+        assert_eq!(original_dataset.record_size(),                      modified_dataset.record_size());
+        assert_eq!(original_dataset.num_records(),                      modified_dataset.num_records())
+    }
+    
+    // Test a NetCDF-3 file conatining a zero-sized unlimited dimension but in which the number of records is indeterminated
+    {
+        const UNLIM_DIM_NAME: &str = "unlim_dim";
+        const UNLIM_DIM_SIZE: usize = 0;
+    
+        // 1: Read a data set where in which the `num_records` is defined
+        let original_dataset: DataSet = {
+            let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_BYTES, NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME);
+            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let data_set: DataSet = file_reader.close().0;
+            tmp_dir.close().unwrap();
+            data_set
+        };
+        
+        // 2. Change the input file bytes (set indeterminated the `num_records`) and read it as a NetCDF-3 data set
+        let modified_dataset: DataSet = {
+            let modified_bytes: Vec<u8> = {
+                // the indeterminate value is (2^32 - 1), see the file format specifications (https://www.unidata.ucar.edu/software/netcdf/docs/file_format_specifications.html)
+                let indeterminated_value_as_bytes: [u8; 4] = std::u32::MAX.to_be_bytes();
+                let mut bytes: Vec<u8> = NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_BYTES.to_vec();
+                bytes[4..8].copy_from_slice(&indeterminated_value_as_bytes);
+                bytes
+            };
+            let (tmp_dir, input_file_path) =  copy_bytes_to_tmp_file(&modified_bytes[..], NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME);
+            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let data_set: DataSet = file_reader.close().0;
+            tmp_dir.close().unwrap();
+            data_set
+        };
+        
+        // 3. Compare the unlimited-size dimensions of the 2 datasets
+        assert_eq!(true,                                               original_dataset.has_unlimited_dim());
+        {
+            let unlim_dim = original_dataset.get_unlimited_dim().unwrap();
+            assert_eq!(UNLIM_DIM_NAME,                                  unlim_dim.name());
+            assert_eq!(UNLIM_DIM_SIZE,                                  unlim_dim.size());
+            assert_eq!(false,                                           unlim_dim.is_fixed());
+            assert_eq!(true,                                            unlim_dim.is_unlimited());
+            assert_eq!(DimensionType::UnlimitedSize,                    unlim_dim.dim_type());
+        }
+        
+        assert_eq!(true,                                                modified_dataset.has_unlimited_dim());
+        {
+            let unlim_dim = modified_dataset.get_unlimited_dim().unwrap();
+            assert_eq!(UNLIM_DIM_NAME,                                  unlim_dim.name());
+            assert_eq!(UNLIM_DIM_SIZE,                                  unlim_dim.size());
+            assert_eq!(false,                                           unlim_dim.is_fixed());
+            assert_eq!(true,                                            unlim_dim.is_unlimited());
+            assert_eq!(DimensionType::UnlimitedSize,                    unlim_dim.dim_type());
+        }
+        
+        assert_eq!(original_dataset.record_size(),                      modified_dataset.record_size());
+        assert_eq!(original_dataset.num_records(),                      modified_dataset.num_records())
     }
 }

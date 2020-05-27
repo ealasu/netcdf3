@@ -1,4 +1,5 @@
 #![cfg(test)]
+use std::rc::Rc;
 
 use copy_to_tmp_file::{
     copy_bytes_to_tmp_file,
@@ -7,12 +8,13 @@ use copy_to_tmp_file::{
     EMPTY_DATA_SET_FILE_NAME, EMPTY_DATA_SET_FILE_BYTES,
     SCALAR_VARIABLES_FILE_NAME, SCALAR_VARIABLES_FILE_BYTES,
     NC3_FILL_VALUES_FILE_NAME, NC3_FILL_VALUES_FILE_BYTES,
+    NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME, NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_BYTES,
 };
 
 use netcdf3::{
     FileReader,
     DataSet, Variable, DataType, Version,
-    DimensionType,
+    Dimension, DimensionType,
 };
 use netcdf3::NC_FILL_I8;
 use netcdf3::NC_FILL_U8;
@@ -427,7 +429,6 @@ fn test_read_file_scalar_vars() {
     let data_set: &DataSet = file_reader.data_set();
     assert_eq!(0,                                   data_set.num_global_attrs());
     assert_eq!(0,                                   data_set.num_dims());
-
     assert_eq!(6,                                   data_set.num_vars());
 
     // `scalar_value_i8`
@@ -565,7 +566,6 @@ fn test_read_file_nc_fill_values() {
     let data_set: &DataSet = file_reader.data_set();
     assert_eq!(0,                                   data_set.num_global_attrs());
     assert_eq!(0,                                   data_set.num_dims());
-
     assert_eq!(6,                                   data_set.num_vars());
 
     // `scalar_value_i8`
@@ -679,4 +679,38 @@ fn test_read_file_nc_fill_values() {
     }
 
     tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_read_file_zero_sized_unlimited_dim() {
+
+    const UNLIM_DIM_NAME: &str = "unlim_dim";
+    const UNLIM_DIM_SIZE: usize = 0;
+
+    // Copy bytes to a temporary file
+    // ------------------------------
+    let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_BYTES, NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME);
+
+    // Open the NetCDF-3 file
+    // ----------------------
+    let file_reader = FileReader::open(input_data_file_path).unwrap();
+    // Check the NetCDF-3 definition
+    // -----------------------------
+    let (data_set, version): (DataSet, Version) = file_reader.close();
+
+    assert_eq!(Version::Classic,                    version);
+    assert_eq!(0,                                   data_set.num_global_attrs());
+    assert_eq!(1,                                   data_set.num_dims());
+    assert_eq!(0,                                   data_set.num_vars());
+
+    // Check the zero-sized unlimited dimension
+    assert_eq!(true,                                data_set.has_unlimited_dim());
+    let unlim_dim: Rc<Dimension> = data_set.get_unlimited_dim().unwrap();
+    assert_eq!(UNLIM_DIM_NAME,                      unlim_dim.name());
+    assert_eq!(UNLIM_DIM_SIZE,                      unlim_dim.size());
+    assert_eq!(false,                               unlim_dim.is_fixed());
+    assert_eq!(true,                                unlim_dim.is_unlimited());
+    assert_eq!(DimensionType::UnlimitedSize,        unlim_dim.dim_type());
+
+    tmp_dir.close().unwrap()
 }

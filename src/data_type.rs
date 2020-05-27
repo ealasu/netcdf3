@@ -12,7 +12,7 @@ const F32_TYPE_C_API_NAME: &'static str = "NC_FLOAT";
 const F64_TYPE_C_API_NAME: &'static str = "NC_DOUBLE";
 
 
-/// All data types supported by the NetCDF-3 format
+/// All the data types supported by the NetCDF-3 format
 ///
 /// # Example
 ///
@@ -25,7 +25,7 @@ const F64_TYPE_C_API_NAME: &'static str = "NC_DOUBLE";
 /// assert_eq!("NC_INT",    DataType::I32.c_api_name());
 /// assert_eq!("NC_FLOAT",  DataType::F32.c_api_name());
 /// assert_eq!("NC_DOUBLE", DataType::F64.c_api_name());
-/// 
+///
 /// assert_eq!(1, DataType::I8.size_of());
 /// assert_eq!(1, DataType::U8.size_of());
 /// assert_eq!(2, DataType::I16.size_of());
@@ -85,7 +85,7 @@ impl DataType {
     ///
     /// # Example
     ///
-    /// ``` 
+    /// ```
     /// # use netcdf3::DataType;
     /// assert_eq!(1, DataType::I8.size_of());
     /// assert_eq!(1, DataType::U8.size_of());
@@ -109,7 +109,7 @@ impl DataType {
     /// Returns the name of the `DataType` commoly used in the NedCDF C API.
     ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// # use netcdf3::DataType;
     /// assert_eq!("NC_BYTE", DataType::I8.c_api_name());
@@ -121,7 +121,7 @@ impl DataType {
     /// ```
     ///
     /// # See also
-    /// 
+    ///
     /// The [NetCDF C-API](https://github.com/Unidata/netcdf-c/blob/master/include/netcdf.h)
     pub fn c_api_name(&self) -> &'static str {
         match self {

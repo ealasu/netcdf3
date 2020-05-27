@@ -84,6 +84,7 @@ pub enum ReadError {
     VariableNotDefined(String),
     VariableMismatchDataType{var_name: String, req: DataType, get: DataType},
     IOErrorKind(std::io::ErrorKind),
+    ComputationNumberOfRecords,
     Unexpected,
 }
 

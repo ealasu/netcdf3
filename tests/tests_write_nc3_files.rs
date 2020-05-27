@@ -16,6 +16,7 @@ use copy_to_tmp_file::{
     EMPTY_DATA_SET_FILE_NAME, EMPTY_DATA_SET_FILE_BYTES,
     NC3_CLASSIC_FILE_NAME, NC3_CLASSIC_FILE_BYTES,
     NC3_64BIT_OFFSET_FILE_NAME, NC3_64BIT_OFFSET_FILE_BYTES,
+    NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME, NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_BYTES,
 };
 
 /// Prefix of the temporary output directories
@@ -351,4 +352,41 @@ fn test_write_file_nc3_64bit_offset() {
 
     assert_eq!(NC3_64BIT_OFFSET_FILE_BYTES.len(),   written_bytes.len());
     assert_eq!(NC3_64BIT_OFFSET_FILE_BYTES,         &written_bytes[..]);
+}
+
+
+#[test]
+fn test_write_file_zero_sized_unlimited_dim() {
+
+    const UNLIM_DIM_NAME: &str = "unlim_dim";
+    const UNLIM_DIM_SIZE: usize = 0;
+
+    fn write_file_zero_sized_unlimited_dim<P: AsRef<Path>>(file_path: P) {
+        let data_set: DataSet = {
+            let mut data_set: DataSet = DataSet::new();
+            data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+            data_set
+        };
+
+        let mut file_writer: FileWriter = FileWriter::open(file_path).unwrap();
+        file_writer.set_def(&data_set, Version::Classic, 0).unwrap();
+        file_writer.close().unwrap();
+    }
+
+    // Write the NetCDF-3 file
+    let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
+    let output_file_path = tmp_dir.path().join(NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME);
+    write_file_zero_sized_unlimited_dim(&output_file_path);
+
+    // Compare the written file with the test data file
+    let written_bytes: Vec<u8> = {
+        let mut written_bytes: Vec<u8> = vec![];
+        let mut written_file: std::fs::File = std::fs::File::open(&output_file_path).unwrap();
+        written_file.read_to_end(&mut written_bytes).unwrap();
+        written_bytes
+    };
+    tmp_dir.close().unwrap();
+
+    assert_eq!(NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_BYTES.len(),       written_bytes.len());
+    assert_eq!(NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_BYTES,             &written_bytes[..]);
 }

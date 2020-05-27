@@ -22,9 +22,13 @@ pub static NC3_FILL_VALUES_FILE_BYTES: &'static[u8] = include_bytes!("../../nc_f
 pub static SCALAR_VARIABLES_FILE_NAME: &'static str = "scalar_vars.nc";
 pub static SCALAR_VARIABLES_FILE_BYTES: &'static[u8] = include_bytes!("../../scalar_vars.nc");
 
-// Another basic Classic NetCDF-3 file used by documention examples
-pub static NC3_BASIC_CLASSIC_FILE_NAME: &'static str = "basic_temp_3D_classic.nc";
-pub static NC3_BASIC_CLASSIC_FILE_BYTES: &'static[u8] = include_bytes!("../../basic_temp_3D_classic.nc");
+// Another light Classic NetCDF-3 file used by documention examples
+pub static NC3_LIGHT_CLASSIC_FILE_NAME: &'static str = "temp_3D_classic_light.nc";
+pub static NC3_LIGHT_CLASSIC_FILE_BYTES: &'static[u8] = include_bytes!("../../temp_3D_classic_light.nc");
+
+// NetCDF-3 file containing a zero-sized unlimited dimension
+pub static NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME: &'static str = "zero_sized_unlimited_dim.nc";
+pub static NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_BYTES: &'static[u8] = include_bytes!("../../zero_sized_unlimited_dim.nc");
 
 /// Copies bytes to a file located in a temporary directory.
 ///

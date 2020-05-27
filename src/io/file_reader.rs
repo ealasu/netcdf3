@@ -25,6 +25,7 @@ use nom::{
         be_f32,
         be_f64,
         be_i64,
+        be_u32,
     },
     branch::alt,
     multi::many_m_n,
@@ -32,6 +33,7 @@ use nom::{
 
 
 use crate::{
+    data_set::DimensionSize,
     DataSet,
     DataType,
     Dimension,
@@ -100,7 +102,7 @@ use crate::{
 /// # // Copy bytes to an temporary file
 /// # let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 ///
-/// // Read variable data from the file
+/// // Open the file and read the header
 /// // ---------------------------------
 /// let mut file_reader: FileReader = FileReader::open(input_file_path).unwrap();
 ///
@@ -132,7 +134,7 @@ use crate::{
 /// assert_eq!("Example of NETCDF3_CLASSIC file",   data_set.get_global_attr_as_string("title").unwrap());
 /// assert_eq!("CF-1.8",                            data_set.get_global_attr_as_string("Conventions").unwrap());
 ///
-/// // Get the variable defintions
+/// // Get the variable definitions
 /// // ----------------------------
 /// assert_eq!(9,                                   data_set.num_vars());
 ///
@@ -141,10 +143,10 @@ use crate::{
 /// assert_eq!(Some(false),                         data_set.is_record_var(LATITUDE_VAR_NAME));
 /// assert_eq!(Some(LATITUDE_VAR_LEN),              data_set.var_len(LATITUDE_VAR_NAME));
 ///
-/// /// ..
+/// // ..
 ///
-/// // Checks the variable attributes
-/// // ------------------------------
+/// // Get the variable attributes
+/// // ---------------------------
 /// assert_eq!(Some(4),                             data_set.num_var_attrs(LATITUDE_VAR_NAME));
 /// assert_eq!("latitude",                          data_set.get_var_attr_as_string(LATITUDE_VAR_NAME, "standard_name").unwrap());
 /// assert_eq!("LATITUDE",                          data_set.get_var_attr_as_string(LATITUDE_VAR_NAME, "long_name").unwrap());
@@ -174,6 +176,7 @@ use crate::{
 /// assert_eq!(Some(&TEMP_I32_VAR_DATA[..]),        var_data[TEMP_I32_VAR_NAME].get_i32());
 /// assert_eq!(Some(&TEMP_F32_VAR_DATA[..]),        var_data[TEMP_F32_VAR_NAME].get_f32());
 /// assert_eq!(Some(&TEMP_F64_VAR_DATA[..]),        var_data[TEMP_F64_VAR_NAME].get_f64());
+///
 /// // ...
 /// # tmp_dir.close();
 /// ```
@@ -182,7 +185,7 @@ pub struct FileReader {
     version: Version,
     input_file_path: PathBuf,
     input_file: std::fs::File,
-    vars_info: std::collections::HashMap<String, (usize, Offset)>,
+    vars_info: Vec<VariableParsedMetadata>
 }
 
 
@@ -222,7 +225,8 @@ impl FileReader {
         };
 
         // Parse the header
-        let (data_set, version, vars_info): (DataSet, Version, Vec<(String, (usize, Offset))>) = FileReader::parse_header(&input)?;
+        let file_size: u64 = std::fs::metadata(&input_file_path)?.len();
+        let (data_set, version, vars_info): (DataSet, Version, Vec<VariableParsedMetadata>) = FileReader::parse_header(&input, file_size)?;
 
         // Return the result
         return Ok(FileReader{
@@ -230,7 +234,7 @@ impl FileReader {
             version: version,
             input_file_path: input_file_path,
             input_file: input_file,
-            vars_info: vars_info.into_iter().collect(),  // convert the list of tuples to a map
+            vars_info: vars_info,  // convert the list of tuples to a map
         })
     }
 
@@ -430,15 +434,14 @@ impl FileReader {
     /// See the method [read_vars](struct.FileReader.html#method.read_vars).
     fn _read_var(&mut self, var_name: &str) -> Result<DataVector, ReadError>
     {
-        let ref mut input = self.input_file;
         let (_, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
             ReadError::VariableNotDefined(String::from(var_name))
         })?;
         let record_size: usize = self.data_set.record_size().unwrap_or(0);
         let num_records: usize = self.data_set.num_records().unwrap_or(0);
         let begin_offset: u64 = {
-                let (_var_size, begin_offset): &(usize, Offset) = self.vars_info.get(var.name()).ok_or(ReadError::Unexpected)?;
-                i64::from(begin_offset.clone()) as u64
+            let var_info: &VariableParsedMetadata = self.find_var_info(var_name).ok_or(ReadError::Unexpected)?;
+            i64::from(var_info.begin_offset.clone()) as u64
         };
         let data_type: DataType = var.data_type();
         let chunk_len: usize = var.chunk_len();
@@ -446,6 +449,7 @@ impl FileReader {
             let num_bytes: usize = chunk_len * data_type.size_of();
             compute_padding_size(num_bytes)
         };
+        let ref mut input = self.input_file;
         input.seek(SeekFrom::Start(begin_offset))?;
         // memory allocation
         let mut data_vec = DataVector::new(data_type, var.len());
@@ -487,25 +491,29 @@ impl FileReader {
     }
 
     /// Parses the NetCDF-3 header
-    fn parse_header(input: &[u8]) -> Result<(DataSet, Version, Vec<(String, (usize, Offset))>), ReadError> {
+    fn parse_header(input: &[u8], total_file_size: u64) -> Result<(DataSet, Version, Vec<VariableParsedMetadata>), ReadError> {
         // the magic word
         let (input, _): (&[u8], &[u8]) = FileReader::parse_magic_word(input).unwrap();
         // the version number
         let (input, version) : (&[u8], Version) = FileReader::parse_version(input).unwrap();
 
         // the number of records
-        let (input, num_of_records): (&[u8], usize) = FileReader::parse_as_usize(input).unwrap();
+        let (input, num_records): (&[u8], Option<usize>) = FileReader::parse_as_usize_optional(input).unwrap();
         let (input, dims_list): (&[u8], Vec<(String, usize)>) = FileReader::parse_dims_list(input).unwrap();
         let (input, global_attrs_list): (&[u8], Vec<_>) = FileReader::parse_attrs_list(input).unwrap();
-        let (_input, vars_list): (&[u8], Vec<_>) = FileReader::parse_vars_list(input, version.clone()).unwrap();
+        let (_input, var_info_list): (&[u8], Vec<VariableParsedMetadata>) = FileReader::parse_vars_list(input, version.clone()).unwrap();
 
         // Create a new dataset
         let mut data_set = DataSet::new();
+        let (num_records, num_records_is_determinated): (usize, bool) = match num_records {
+            Some(num_records) => (num_records, true),
+            None => (0, false),
+        };
 
         // Append it the dimensions
         for (dim_name, dim_size) in dims_list.into_iter() {
             if dim_size == 0 {
-                data_set.set_unlimited_dim(dim_name, num_of_records)?;
+                data_set.set_unlimited_dim(dim_name, num_records)?;
             } else {
                 data_set.add_fixed_dim(dim_name, dim_size)?;
             }
@@ -536,44 +544,75 @@ impl FileReader {
             }
         }
 
-        let mut vars_info: Vec<(String, (usize, Offset))> = vec![];
         // Append the variables
-        for (var_name, var_dim_ids, var_attrs_list, var_data_type, var_size, begin_offset) in vars_list.into_iter() {
-            let var_dim_refs: Vec<Rc<Dimension>> = data_set.get_dims_from_dim_ids(&var_dim_ids)?;
-            // Append the variable
-            data_set.add_var_using_dim_refs(&var_name, var_dim_refs, var_data_type)?;
-            // Save the size and the begin offset of the variable
-            vars_info.push((
-                var_name.to_string(),
-                (var_size, begin_offset)
-            ));
-            // data_set.vars.last_mut()?.1 = Some(begin_offset);
+        let mut record_var_begin_offsets: Vec<Offset> = vec![];  // used to computed the number of records if necessaray
+        for var_info in var_info_list.iter() {
+            let dim_refs: Vec<Rc<Dimension>> = data_set.get_dims_from_dim_ids(&var_info.dim_ids)?;
+            // Create the variable the variable
+            let var: &Variable = data_set.add_var_using_dim_refs(&var_info.name, dim_refs, var_info.data_type.clone())?;
+            // Keep the `begin_offset` of the variable
+            if var.is_record_var() {
+                record_var_begin_offsets.push(var_info.begin_offset.clone());
+            }
             // Append variable attributes
-            for (attr_name, attr_data) in var_attrs_list.into_iter() {
+            let var_name: String = var_info.name.clone();
+            for (attr_name, attr_data) in var_info.attrs_list.iter() {
                 use DataVector::*;
                 match attr_data {
                     I8(data) => {
-                        data_set.add_var_attr_i8(&var_name, &attr_name, data)?;
+                        data_set.add_var_attr_i8(&var_name, &attr_name, data.clone())?;
                     }
                     U8(data) => {
-                        data_set.add_var_attr_u8(&var_name, &attr_name, data)?;
+                        data_set.add_var_attr_u8(&var_name, &attr_name, data.clone())?;
                     }
                     I16(data) => {
-                        data_set.add_var_attr_i16(&var_name, &attr_name, data)?;
+                        data_set.add_var_attr_i16(&var_name, &attr_name, data.clone())?;
                     }
                     I32(data) => {
-                        data_set.add_var_attr_i32(&var_name, &attr_name, data)?;
+                        data_set.add_var_attr_i32(&var_name, &attr_name, data.clone())?;
                     }
                     F32(data) => {
-                        data_set.add_var_attr_f32(&var_name, &attr_name, data)?;
+                        data_set.add_var_attr_f32(&var_name, &attr_name, data.clone())?;
                     }
                     F64(data) => {
-                        data_set.add_var_attr_f64(&var_name, &attr_name, data)?;
+                        data_set.add_var_attr_f64(&var_name, &attr_name, data.clone())?;
                     }
                 }
             }
         }
-        Ok((data_set, version, vars_info))
+
+        // I
+        if !num_records_is_determinated {
+            // Case an *unlimited-size* dim s defined
+            if let Some(dim) = data_set.get_unlimited_dim() {
+                let num_records: usize;
+                // Case: the unlimited dim  is defined but no record variable is defined
+                if record_var_begin_offsets.is_empty() {
+                    num_records = 0;
+                }
+                else {
+                    // Computation of the number of records
+                    let first_begin_offset: u64 = record_var_begin_offsets.into_iter().map(|begin_offset: Offset| i64::from(begin_offset) as u64).min().unwrap();
+                    let all_records_size: u64 = total_file_size  - first_begin_offset; // the size allocated for all record data
+                    let record_size: u64 = data_set.record_size().unwrap() as u64;  // cannot be zero
+                    if record_size == 0 {
+                        return Err(ReadError::Unexpected);
+                    }
+                    num_records = all_records_size.checked_div_euclid(record_size).ok_or(ReadError::Unexpected)? as usize;
+                    let num_rem_bytes: u64 = all_records_size.rem_euclid(record_size);  // the number of remaining bytes
+                    if num_rem_bytes != 0 {
+                        return Err(ReadError::ComputationNumberOfRecords);
+                    }
+                }
+                match &dim.size {
+                    DimensionSize::Unlimited(dim_size) => {
+                        dim_size.replace(num_records);
+                    },
+                    _ => {},
+                }
+            }
+        }
+        Ok((data_set, version, var_info_list))
     }
 
     fn parse_magic_word(input: &[u8]) -> Result<(&[u8], &[u8]), ParseHeaderError>
@@ -606,6 +645,23 @@ impl FileReader {
     fn parse_as_usize(input: &[u8]) -> Result<(&[u8], usize), ParseHeaderError> {
         let (input, number): (&[u8], i32) = FileReader::parse_non_neg_i32(input)?;
         Ok((input, number as usize))
+    }
+
+    /// Parses the number of records
+    ///
+    /// Returns :
+    /// - The numbers of records if it is a valid integer.
+    /// - `None` if the number of records is indeterminated
+    fn parse_as_usize_optional(input: &[u8]) -> Result<(&[u8], Option<usize>), ParseHeaderError> {
+        const INDETERMINATE_VALUE: u32 = std::u32::MAX;
+        let (input, value): (&[u8], u32) = verify(be_u32, |number: &u32| *number <= (std::i32::MAX as u32) || *number == INDETERMINATE_VALUE)(input).map_err(|err: NomError|{
+            ParseHeaderError::new(err, ParseHeaderErrorKind::NonNegativeI32)
+        })?;
+        let value: Option<usize> = match value {
+            INDETERMINATE_VALUE => None,
+            _ => Some(value as usize),
+        };
+        Ok((input, value))
     }
 
     /// Parses a non-negative `i32` word and converts it to a `u32`.
@@ -726,7 +782,7 @@ impl FileReader {
     }
 
     // Parses a list of variables from the header.
-    fn parse_vars_list(input: &[u8], version: Version) -> Result<(&[u8], Vec<(String, Vec<usize>, Vec<(String, DataVector)>, DataType, usize, Offset)>), ParseHeaderError>
+    fn parse_vars_list(input: &[u8], version: Version) -> Result<(&[u8], Vec<VariableParsedMetadata>), ParseHeaderError>
     {
         fn parse_dim_ids_list(input: &[u8]) -> Result<(&[u8], Vec<usize>), ParseHeaderError>
         {
@@ -760,22 +816,29 @@ impl FileReader {
             })
         }
 
-        fn parse_var(input: &[u8], version: Version) -> Result<(&[u8], (String, Vec<usize>, Vec<(String, DataVector)>, DataType, usize, Offset)), ParseHeaderError> {
+        fn parse_var(input: &[u8], version: Version) -> Result<(&[u8], VariableParsedMetadata), ParseHeaderError> {
             // Variable name
             let (input, var_name): (&[u8], String) = FileReader::parse_name_string(input)?;
 
             // list of the dimensions
-            let (input, dim_ids_list): (&[u8], Vec<usize>) = parse_dim_ids_list(input)?;
+            let (input, dim_ids): (&[u8], Vec<usize>) = parse_dim_ids_list(input)?;
             // list of the variable attributes
-            let (input, var_attrs_list): (&[u8], Vec<(String, DataVector)>) = FileReader::parse_attrs_list(input)?;
+            let (input, attrs_list): (&[u8], Vec<(String, DataVector)>) = FileReader::parse_attrs_list(input)?;
             // data type of the variable
-            let (input, var_data_type): (& [u8], DataType) = FileReader::parse_data_type(input)?;
+            let (input, data_type): (& [u8], DataType) = FileReader::parse_data_type(input)?;
             // size occupied in each record by the variable (number of bytes)
-            let (input, var_size): (&[u8], usize) = FileReader::parse_as_usize(input)?;
+            let (input, chunk_size): (&[u8], Option<usize>) = FileReader::parse_as_usize_optional(input)?;
             // begin offset (number of bytes)
             let (input, begin_offset): (&[u8], Offset) = parse_offset(input, version)?;
-
-            return Ok((input, (var_name, dim_ids_list, var_attrs_list, var_data_type, var_size, begin_offset)));
+            let var_def = VariableParsedMetadata {
+                name: var_name,
+                dim_ids: dim_ids,
+                attrs_list: attrs_list,
+                data_type: data_type,
+                _chunk_size: chunk_size,
+                begin_offset: begin_offset,
+            };
+            return Ok((input, var_def));
         }
         let (input, var_tag): (&[u8], &[u8]) = alt((tag(ABSENT_TAG), tag(VARIABLE_TAG)))(input).map_err(|err: NomError| {
             ParseHeaderError::new(err, ParseHeaderErrorKind::VarTag)
@@ -784,7 +847,7 @@ impl FileReader {
             return Ok((input, vec![]));
         }
         let (mut input, num_of_vars): (&[u8], usize) = FileReader::parse_as_usize(input)?;
-        let mut vars_list: Vec<(String, Vec<usize>, Vec<(String, DataVector)>, DataType, usize, Offset)> = vec![];
+        let mut vars_list: Vec<VariableParsedMetadata> = vec![];
         for _ in 0..num_of_vars {
             let (temp_input, var) = parse_var(input, version.clone())?;
             input = temp_input;
@@ -792,4 +855,18 @@ impl FileReader {
         }
         Ok((input, vars_list))
     }
+
+    fn find_var_info(&self, var_name: &str) -> Option<&VariableParsedMetadata> {
+        self.vars_info.iter().find(|var_info| var_info.name == var_name)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct VariableParsedMetadata {
+    name: String,
+    dim_ids: Vec<usize>,
+    attrs_list: Vec<(String, DataVector)>,
+    data_type: DataType,
+    _chunk_size: Option<usize>,
+    begin_offset: Offset,
 }

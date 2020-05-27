@@ -20,7 +20,9 @@ NC3_FILL_VALUES_FILE_NAME = "nc_fill_values.nc"
 #: Scalar variables
 SCALAR_VARIABLES_FILE_NAME = "scalar_vars.nc"
 #: Another NetCDF-3 (classic version)
-NC3_BASIC_CLASSIC_FILE_NAME = "basic_temp_3D_classic.nc"
+NC3_LIGHT_CLASSIC_FILE_NAME = "temp_3D_classic_light.nc"
+#: NetCDF-3 file containing a zero-sized unlimited dimension
+NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME = "zero_sized_unlimited_dim.nc"
 
 
 def write_file_nc_fill_values(file_path: str):
@@ -63,9 +65,9 @@ def write_file_empty_data_set(file_path: str):
         pass
 
 
-def write_file_basic_nc3_classic(file_path: str):
+def write_file_basic_nc3_classic_light(file_path: str):
     """
-    Another NetCDF-3 (classic version)
+    A basic and light NetCDF-3 file (classic version), used in examples of the crate docu
     """
     with netCDF4.Dataset(file_path, format="NETCDF3_CLASSIC", mode="w") as ds:
         ds.createDimension("latitude", 3)
@@ -78,7 +80,16 @@ def write_file_basic_nc3_classic(file_path: str):
         var[:] = np.reshape(
             np.array([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0], dtype=np.float64),
             newshape=(3, 4),
-        );
+        )
+
+
+def write_file_zero_sized_unlimited_dim(file_path: str):
+    """
+    Create a NetCDF-3 file containing a zero-sized unlimited dimension
+    """
+    with netCDF4.Dataset(file_path, format="NETCDF3_CLASSIC", mode="w") as ds:
+        ds.createDimension("unlim_dim")
+
 
 def define_temperatures_dataset(ds):
 
@@ -255,4 +266,7 @@ if __name__ == "__main__":
     write_file_scalar_vars(os.path.join(output_dir, SCALAR_VARIABLES_FILE_NAME))
 
     # Create another basic `NETCDF3_CLASSIC` data file
-    write_file_basic_nc3_classic(os.path.join(output_dir, NC3_BASIC_CLASSIC_FILE_NAME))
+    write_file_basic_nc3_classic_light(os.path.join(output_dir, NC3_LIGHT_CLASSIC_FILE_NAME))
+
+    # Create another basic `NETCDF3_CLASSIC` data file
+    write_file_zero_sized_unlimited_dim(os.path.join(output_dir, NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME))
