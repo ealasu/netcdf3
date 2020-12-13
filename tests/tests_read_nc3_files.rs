@@ -334,55 +334,55 @@ fn check_temperatures_data(file_reader: &mut FileReader)
     assert_eq!(true,                                file_reader.data_set().has_var(LATITUDE_VAR_NAME));
     assert_eq!(Some(DataType::F32),                 file_reader.data_set().var_data_type(LATITUDE_VAR_NAME));
     assert_eq!(Some(LATITUDE_VAR_LEN),              file_reader.data_set().var_len(LATITUDE_VAR_NAME));
-    assert_eq!(Ok(LATITUDE_VAR_DATA.to_vec()),      file_reader.read_var_to_f32(LATITUDE_VAR_NAME));
+    assert_eq!(Ok(LATITUDE_VAR_DATA.to_vec()),      file_reader.read_var_f32(LATITUDE_VAR_NAME));
 
     // `longitude` data
     assert_eq!(true,                                file_reader.data_set().has_var(LONGITUDE_VAR_NAME));
     assert_eq!(Some(DataType::F32),                 file_reader.data_set().var_data_type(LONGITUDE_VAR_NAME));
     assert_eq!(Some(LONGITUDE_VAR_LEN),             file_reader.data_set().var_len(LONGITUDE_VAR_NAME));
-    assert_eq!(Ok(LONGITUDE_VAR_DATA.to_vec()),     file_reader.read_var_to_f32(LONGITUDE_VAR_NAME));
+    assert_eq!(Ok(LONGITUDE_VAR_DATA.to_vec()),     file_reader.read_var_f32(LONGITUDE_VAR_NAME));
 
     // `time` data
     assert_eq!(true,                                file_reader.data_set().has_var(TIME_VAR_NAME));
     assert_eq!(Some(DataType::F32),                 file_reader.data_set().var_data_type(TIME_VAR_NAME));
     assert_eq!(Some(TIME_VAR_LEN),                  file_reader.data_set().var_len(TIME_VAR_NAME));
-    assert_eq!(Ok(TIME_VAR_DATA.to_vec()),          file_reader.read_var_to_f32(TIME_VAR_NAME));
+    assert_eq!(Ok(TIME_VAR_DATA.to_vec()),          file_reader.read_var_f32(TIME_VAR_NAME));
 
     // `temperature_i8` data
     assert_eq!(true,                                file_reader.data_set().has_var(TEMP_I8_VAR_NAME));
     assert_eq!(Some(DataType::I8),                  file_reader.data_set().var_data_type(TEMP_I8_VAR_NAME));
     assert_eq!(Some(TEMP_I8_VAR_LEN),               file_reader.data_set().var_len(TEMP_I8_VAR_NAME));
-    assert_eq!(Ok(TEMP_I8_VAR_DATA.to_vec()),       file_reader.read_var_to_i8(TEMP_I8_VAR_NAME));
+    assert_eq!(Ok(TEMP_I8_VAR_DATA.to_vec()),       file_reader.read_var_i8(TEMP_I8_VAR_NAME));
 
     // `temperature_u8` data
     assert_eq!(true,                                file_reader.data_set().has_var(TEMP_U8_VAR_NAME));
     assert_eq!(Some(DataType::U8),                  file_reader.data_set().var_data_type(TEMP_U8_VAR_NAME));
     assert_eq!(Some(TEMP_U8_VAR_LEN),               file_reader.data_set().var_len(TEMP_U8_VAR_NAME));
-    assert_eq!(Ok(TEMP_U8_VAR_DATA.to_vec()),       file_reader.read_var_to_u8(TEMP_U8_VAR_NAME));
+    assert_eq!(Ok(TEMP_U8_VAR_DATA.to_vec()),       file_reader.read_var_u8(TEMP_U8_VAR_NAME));
 
     // `temperature_i16` data
     assert_eq!(true,                                file_reader.data_set().has_var(TEMP_I16_VAR_NAME));
     assert_eq!(Some(DataType::I16),                 file_reader.data_set().var_data_type(TEMP_I16_VAR_NAME));
     assert_eq!(Some(TEMP_I16_VAR_LEN),              file_reader.data_set().var_len(TEMP_I16_VAR_NAME));
-    assert_eq!(Ok(TEMP_I16_VAR_DATA.to_vec()),      file_reader.read_var_to_i16(TEMP_I16_VAR_NAME));
+    assert_eq!(Ok(TEMP_I16_VAR_DATA.to_vec()),      file_reader.read_var_i16(TEMP_I16_VAR_NAME));
 
     // `temperature_i32` data
     assert_eq!(true,                                file_reader.data_set().has_var(TEMP_I32_VAR_NAME));
     assert_eq!(Some(DataType::I32),                 file_reader.data_set().var_data_type(TEMP_I32_VAR_NAME));
     assert_eq!(Some(TEMP_I32_VAR_LEN),              file_reader.data_set().var_len(TEMP_I32_VAR_NAME));
-    assert_eq!(Ok(TEMP_I32_VAR_DATA.to_vec()),      file_reader.read_var_to_i32(TEMP_I32_VAR_NAME));
+    assert_eq!(Ok(TEMP_I32_VAR_DATA.to_vec()),      file_reader.read_var_i32(TEMP_I32_VAR_NAME));
 
     // `temperature_f32` data
     assert_eq!(true,                                file_reader.data_set().has_var(TEMP_F32_VAR_NAME));
     assert_eq!(Some(DataType::F32),                 file_reader.data_set().var_data_type(TEMP_F32_VAR_NAME));
     assert_eq!(Some(TEMP_F32_VAR_LEN),              file_reader.data_set().var_len(TEMP_F32_VAR_NAME));
-    assert_eq!(Ok(TEMP_F32_VAR_DATA.to_vec()),      file_reader.read_var_to_f32(TEMP_F32_VAR_NAME));
+    assert_eq!(Ok(TEMP_F32_VAR_DATA.to_vec()),      file_reader.read_var_f32(TEMP_F32_VAR_NAME));
 
     // `temperature_f64` data
     assert_eq!(true,                                file_reader.data_set().has_var(TEMP_F64_VAR_NAME));
     assert_eq!(Some(DataType::F64),                 file_reader.data_set().var_data_type(TEMP_F64_VAR_NAME));
     assert_eq!(Some(TEMP_F64_VAR_LEN),              file_reader.data_set().var_len(TEMP_F64_VAR_NAME));
-    assert_eq!(Ok(TEMP_F64_VAR_DATA.to_vec()),      file_reader.read_var_to_f64(TEMP_F64_VAR_NAME));
+    assert_eq!(Ok(TEMP_F64_VAR_DATA.to_vec()),      file_reader.read_var_f64(TEMP_F64_VAR_NAME));
 }
 
 #[test]
@@ -503,42 +503,42 @@ fn test_read_file_scalar_vars() {
     {
         assert_eq!(Some(DataType::I8),              file_reader.data_set().var_data_type(SCALAR_VAR_I8_NAME));
         assert_eq!(Some(1),                         file_reader.data_set().var_len(SCALAR_VAR_I8_NAME));
-        assert_eq!(Ok(vec![42]),                    file_reader.read_var_to_i8(SCALAR_VAR_I8_NAME));
+        assert_eq!(Ok(vec![42]),                    file_reader.read_var_i8(SCALAR_VAR_I8_NAME));
     }
     // `scalar_value_u8`
     assert_eq!(true,                                file_reader.data_set().has_var(SCALAR_VAR_U8_NAME));
     {
         assert_eq!(Some(DataType::U8),              file_reader.data_set().var_data_type(SCALAR_VAR_U8_NAME));
         assert_eq!(Some(1),                         file_reader.data_set().var_len(SCALAR_VAR_U8_NAME));
-        assert_eq!(Ok(vec![42]),                    file_reader.read_var_to_u8(SCALAR_VAR_U8_NAME));
+        assert_eq!(Ok(vec![42]),                    file_reader.read_var_u8(SCALAR_VAR_U8_NAME));
     }
     // `scalar_value_i16`
     assert_eq!(true,                                file_reader.data_set().has_var(SCALAR_VAR_I16_NAME));
     {
         assert_eq!(Some(DataType::I16),             file_reader.data_set().var_data_type(SCALAR_VAR_I16_NAME));
         assert_eq!(Some(1),                         file_reader.data_set().var_len(SCALAR_VAR_I16_NAME));
-        assert_eq!(Ok(vec![42]),                    file_reader.read_var_to_i16(SCALAR_VAR_I16_NAME));
+        assert_eq!(Ok(vec![42]),                    file_reader.read_var_i16(SCALAR_VAR_I16_NAME));
     }
     // `scalar_value_i32`
     assert_eq!(true,                                file_reader.data_set().has_var(SCALAR_VAR_I32_NAME));
     {
         assert_eq!(Some(DataType::I32),             file_reader.data_set().var_data_type(SCALAR_VAR_I32_NAME));
         assert_eq!(Some(1),                         file_reader.data_set().var_len(SCALAR_VAR_I32_NAME));
-        assert_eq!(Ok(vec![42]),                    file_reader.read_var_to_i32(SCALAR_VAR_I32_NAME));
+        assert_eq!(Ok(vec![42]),                    file_reader.read_var_i32(SCALAR_VAR_I32_NAME));
     }
     // `scalar_value_f32`
     assert_eq!(true,                                file_reader.data_set().has_var(SCALAR_VAR_F32_NAME));
     {
         assert_eq!(Some(DataType::F32),             file_reader.data_set().var_data_type(SCALAR_VAR_F32_NAME));
         assert_eq!(Some(1),                         file_reader.data_set().var_len(SCALAR_VAR_F32_NAME));
-        assert_eq!(Ok(vec![42.0]),                  file_reader.read_var_to_f32(SCALAR_VAR_F32_NAME));
+        assert_eq!(Ok(vec![42.0]),                  file_reader.read_var_f32(SCALAR_VAR_F32_NAME));
     }
     // `scalar_value_f64`
     assert_eq!(true,                                file_reader.data_set().has_var(SCALAR_VAR_F64_NAME));
     {
         assert_eq!(Some(DataType::F64),             file_reader.data_set().var_data_type(SCALAR_VAR_F64_NAME));
         assert_eq!(Some(1),                         file_reader.data_set().var_len(SCALAR_VAR_F64_NAME));
-        assert_eq!(Ok(vec![42.0]),                  file_reader.read_var_to_f64(SCALAR_VAR_F64_NAME));
+        assert_eq!(Ok(vec![42.0]),                  file_reader.read_var_f64(SCALAR_VAR_F64_NAME));
     }
 
     tmp_dir.close().unwrap();
@@ -640,42 +640,42 @@ fn test_read_file_nc_fill_values() {
     {
         assert_eq!(Some(DataType::I8),              file_reader.data_set().var_data_type(VAR_I8_NAME));
         assert_eq!(Some(1),                         file_reader.data_set().var_len(VAR_I8_NAME));
-        assert_eq!(Ok(vec![NC_FILL_I8]),            file_reader.read_var_to_i8(VAR_I8_NAME));
+        assert_eq!(Ok(vec![NC_FILL_I8]),            file_reader.read_var_i8(VAR_I8_NAME));
     }
     // `scalar_value_u8`
     assert_eq!(true,                                file_reader.data_set().has_var(VAR_U8_NAME));
     {
         assert_eq!(Some(DataType::U8),              file_reader.data_set().var_data_type(VAR_U8_NAME));
         assert_eq!(Some(1),                         file_reader.data_set().var_len(VAR_U8_NAME));
-        assert_eq!(Ok(vec![NC_FILL_U8]),            file_reader.read_var_to_u8(VAR_U8_NAME));
+        assert_eq!(Ok(vec![NC_FILL_U8]),            file_reader.read_var_u8(VAR_U8_NAME));
     }
     // `scalar_value_i16`
     assert_eq!(true,                                file_reader.data_set().has_var(VAR_I16_NAME));
     {
         assert_eq!(Some(DataType::I16),             file_reader.data_set().var_data_type(VAR_I16_NAME));
         assert_eq!(Some(1),                         file_reader.data_set().var_len(VAR_I16_NAME));
-        assert_eq!(Ok(vec![NC_FILL_I16]),           file_reader.read_var_to_i16(VAR_I16_NAME));
+        assert_eq!(Ok(vec![NC_FILL_I16]),           file_reader.read_var_i16(VAR_I16_NAME));
     }
     // `scalar_value_i32`
     assert_eq!(true,                                file_reader.data_set().has_var(VAR_I32_NAME));
     {
         assert_eq!(Some(DataType::I32),             file_reader.data_set().var_data_type(VAR_I32_NAME));
         assert_eq!(Some(1),                         file_reader.data_set().var_len(VAR_I32_NAME));
-        assert_eq!(Ok(vec![NC_FILL_I32]),           file_reader.read_var_to_i32(VAR_I32_NAME));
+        assert_eq!(Ok(vec![NC_FILL_I32]),           file_reader.read_var_i32(VAR_I32_NAME));
     }
     // `scalar_value_f32`
     assert_eq!(true,                                file_reader.data_set().has_var(VAR_F32_NAME));
     {
         assert_eq!(Some(DataType::F32),             file_reader.data_set().var_data_type(VAR_F32_NAME));
         assert_eq!(Some(1),                         file_reader.data_set().var_len(VAR_F32_NAME));
-        assert_eq!(Ok(vec![NC_FILL_F32]),           file_reader.read_var_to_f32(VAR_F32_NAME));
+        assert_eq!(Ok(vec![NC_FILL_F32]),           file_reader.read_var_f32(VAR_F32_NAME));
     }
     // `scalar_value_f64`
     assert_eq!(true,                                file_reader.data_set().has_var(VAR_F64_NAME));
     {
         assert_eq!(Some(DataType::F64),             file_reader.data_set().var_data_type(VAR_F64_NAME));
         assert_eq!(Some(1),                         file_reader.data_set().var_len(VAR_F64_NAME));
-        assert_eq!(Ok(vec![NC_FILL_F64]),           file_reader.read_var_to_f64(VAR_F64_NAME));
+        assert_eq!(Ok(vec![NC_FILL_F64]),           file_reader.read_var_f64(VAR_F64_NAME));
     }
 
     tmp_dir.close().unwrap();

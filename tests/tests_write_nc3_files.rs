@@ -17,6 +17,7 @@ use copy_to_tmp_file::{
     NC3_CLASSIC_FILE_NAME, NC3_CLASSIC_FILE_BYTES,
     NC3_64BIT_OFFSET_FILE_NAME, NC3_64BIT_OFFSET_FILE_BYTES,
     NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME, NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_BYTES,
+    NC3_CONTAINING_DEFAULT_FILL_VALUES_FILE_NAME, NC3_CONTAINING_DEFAULT_FILL_VALUES_FILE_BYTES,
 };
 
 /// Prefix of the temporary output directories
@@ -354,6 +355,139 @@ fn test_write_file_nc3_64bit_offset() {
     assert_eq!(NC3_64BIT_OFFSET_FILE_BYTES,         &written_bytes[..]);
 }
 
+
+#[test]
+fn test_write_file_containing_default_fill_values() {
+    const DIM_NAME: &str = "dimension_0";
+    const DIM_LEN: usize= 3;
+
+    const VAR_I8_NAME: &str = "var_i8";
+    const VAR_U8_NAME: &str = "var_u8";
+    const VAR_I16_NAME: &str = "var_i16";
+    const VAR_I32_NAME: &str = "var_i32";
+    const VAR_F32_NAME: &str = "var_f32";
+    const VAR_F64_NAME: &str = "var_f64";
+    fn write_file_containing_default_fill_values<P: AsRef<Path>>(file_path: P) {
+
+        let mut data_set: DataSet = DataSet::new();
+
+        data_set.set_unlimited_dim(DIM_NAME, DIM_LEN).unwrap();
+
+        data_set.add_var_i32(DIM_NAME, &[DIM_NAME]).unwrap();
+        data_set.add_var_i8(VAR_I8_NAME, &[DIM_NAME]).unwrap();
+        data_set.add_var_u8(VAR_U8_NAME, &[DIM_NAME]).unwrap();
+        data_set.add_var_i16(VAR_I16_NAME, &[DIM_NAME]).unwrap();
+        data_set.add_var_i32(VAR_I32_NAME, &[DIM_NAME]).unwrap();
+        data_set.add_var_f32(VAR_F32_NAME, &[DIM_NAME]).unwrap();
+        data_set.add_var_f64(VAR_F64_NAME, &[DIM_NAME]).unwrap();
+
+        let mut file_writer: FileWriter = FileWriter::open(file_path).unwrap();
+
+        // Define data set
+        file_writer.set_def(&data_set, Version::Classic, 0).unwrap();
+
+        // Write a part of the values
+        file_writer.write_record_i32(DIM_NAME, 0, &[1]).unwrap();
+        file_writer.write_record_i32(DIM_NAME, 1, &[2]).unwrap();
+        file_writer.write_record_i32(DIM_NAME, 2, &[3]).unwrap();
+
+        file_writer.write_record_i8(VAR_I8_NAME, 0, &[1]).unwrap();
+        // file_writer.write_record_i8(VAR_I8_NAME, 1, &[2]).unwrap();
+        file_writer.write_record_i8(VAR_I8_NAME, 2, &[3]).unwrap();
+
+        file_writer.write_record_u8(VAR_U8_NAME, 0, &[1]).unwrap();
+        // file_writer.write_record_u8(VAR_U8_NAME, 1, &[2]).unwrap();
+        file_writer.write_record_u8(VAR_U8_NAME, 2, &[3]).unwrap();
+
+        file_writer.write_record_i16(VAR_I16_NAME, 0, &[1]).unwrap();
+        // file_writer.write_record_i16(VAR_I16_NAME, 1, &[2]).unwrap();
+        file_writer.write_record_i16(VAR_I16_NAME, 2, &[3]).unwrap();
+
+        file_writer.write_record_i32(VAR_I32_NAME, 0, &[1]).unwrap();
+        // file_writer.write_record_i32(VAR_I32_NAME, 1, &[2]).unwrap();
+        file_writer.write_record_i32(VAR_I32_NAME, 2, &[3]).unwrap();
+
+        file_writer.write_record_f32(VAR_F32_NAME, 0, &[1.0]).unwrap();
+        // file_writer.write_record_f32(VAR_F32_NAME, 1, &[1.0]).unwrap();
+        file_writer.write_record_f32(VAR_F32_NAME, 2, &[3.0]).unwrap();
+
+        file_writer.write_record_f64(VAR_F64_NAME, 0, &[1.0]).unwrap();
+        // file_writer.write_record_f64(VAR_F64_NAME, 1, &[2.0]).unwrap();
+        file_writer.write_record_f64(VAR_F64_NAME, 2, &[3.0]).unwrap();
+
+        file_writer.close().unwrap();
+    }
+
+    // Write the NetCDF-3 file
+    let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
+    let output_file_path = tmp_dir.path().join(NC3_CONTAINING_DEFAULT_FILL_VALUES_FILE_NAME);
+    write_file_containing_default_fill_values(&output_file_path);
+
+    
+    // Read and compare the previously written values
+    {
+        use std::collections::HashMap;
+        use netcdf3::{FileReader, DataVector, DataType};
+        use netcdf3::{
+            NC_FILL_I8,NC_FILL_U8,
+            NC_FILL_I16,NC_FILL_I32,
+            NC_FILL_F32, NC_FILL_F64,
+        };
+
+        let mut file_reader: FileReader = FileReader::open(&output_file_path).unwrap();
+        let variables: HashMap<String, DataVector> = file_reader.read_all_vars().unwrap();
+
+        // let _: (DataSet, Version) = file_reader.close();
+
+        assert_eq!(7,                                       variables.len());
+        
+        assert_eq!(true,                                    variables.contains_key(DIM_NAME));
+        assert_eq!(DataType::I32,                            variables[DIM_NAME].data_type());
+        assert_eq!(Some(&[1, 2, 3][..]),                    variables[DIM_NAME].get_i32());
+    
+        assert_eq!(true,                                    variables.contains_key(VAR_I8_NAME));
+        assert_eq!(DataType::I8,                            variables[VAR_I8_NAME].data_type());
+        assert_ne!(Some(&[1, 2, 3][..]),                    variables[VAR_I8_NAME].get_i8());
+        assert_eq!(Some(&[1, NC_FILL_I8, 3][..]),           variables[VAR_I8_NAME].get_i8());
+
+        assert_eq!(true,                                    variables.contains_key(VAR_U8_NAME));
+        assert_eq!(DataType::U8,                            variables[VAR_U8_NAME].data_type());
+        assert_ne!(Some(&[1, 2, 3][..]),                    variables[VAR_U8_NAME].get_u8());
+        assert_eq!(Some(&[1, NC_FILL_U8, 3][..]),           variables[VAR_U8_NAME].get_u8());
+
+        assert_eq!(true,                                    variables.contains_key(VAR_I16_NAME));
+        assert_eq!(DataType::I16,                           variables[VAR_I16_NAME].data_type());
+        assert_ne!(Some(&[1, 2, 3][..]),                    variables[VAR_I16_NAME].get_i16());
+        assert_eq!(Some(&[1, NC_FILL_I16, 3][..]),          variables[VAR_I16_NAME].get_i16());
+
+        assert_eq!(true,                                    variables.contains_key(VAR_I32_NAME));
+        assert_eq!(DataType::I32,                           variables[VAR_I32_NAME].data_type());
+        assert_ne!(Some(&[1, 2, 3][..]),                    variables[VAR_I32_NAME].get_i32());
+        assert_eq!(Some(&[1, NC_FILL_I32, 3][..]),          variables[VAR_I32_NAME].get_i32());
+
+        assert_eq!(true,                                    variables.contains_key(VAR_F32_NAME));
+        assert_eq!(DataType::F32,                           variables[VAR_F32_NAME].data_type());
+        assert_ne!(Some(&[1.0, 2.0, 3.0][..]),              variables[VAR_F32_NAME].get_f32());
+        assert_eq!(Some(&[1.0, NC_FILL_F32, 3.0][..]),      variables[VAR_F32_NAME].get_f32());
+
+        assert_eq!(true,                                    variables.contains_key(VAR_F64_NAME));
+        assert_eq!(DataType::F64,                           variables[VAR_F64_NAME].data_type());
+        assert_ne!(Some(&[1.0, 2.0, 3.0][..]),              variables[VAR_F64_NAME].get_f64());
+        assert_eq!(Some(&[1.0, NC_FILL_F64, 3.0][..]),      variables[VAR_F64_NAME].get_f64());
+    }
+    
+    // Compare the written file with the test data file
+    let written_bytes: Vec<u8> = {
+        let mut written_bytes: Vec<u8> = vec![];
+        let mut written_file: std::fs::File = std::fs::File::open(&output_file_path).unwrap();
+        written_file.read_to_end(&mut written_bytes).unwrap();
+        written_bytes
+    };
+    tmp_dir.close().unwrap();
+
+    assert_eq!(NC3_CONTAINING_DEFAULT_FILL_VALUES_FILE_BYTES.len(),       written_bytes.len());
+    assert_eq!(NC3_CONTAINING_DEFAULT_FILL_VALUES_FILE_BYTES,             &written_bytes[..]);
+}
 
 #[test]
 fn test_write_file_zero_sized_unlimited_dim() {

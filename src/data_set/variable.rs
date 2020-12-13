@@ -9,9 +9,9 @@ use crate::io::compute_padding_size;
 
 /// NetCDF-3 variable
 ///
-/// `Variable` instances are managed by a [`DataSet`](struct.DataSet.html).
+/// `Variable` instances are managed by the struct [`DataSet`](struct.DataSet.html).
 ///
-/// `DataSet`s allow to create, read, remove and rename `Variable`s.
+/// `DataSet`s allow to create, get, remove and rename `Variable`s.
 ///
 /// # Examples
 ///
@@ -65,24 +65,24 @@ use crate::io::compute_padding_size;
 /// data_set.add_fixed_dim(DIM_NAME, VAR_DATA_LEN).unwrap();
 /// data_set.add_var_i32::<&str>(VAR_NAME_1, &[DIM_NAME]).unwrap();
 ///
-/// assert_eq!(1,                   data_set.num_vars());
-/// assert_eq!(true,                data_set.has_var(VAR_NAME_1));
-/// assert_eq!(Some(VAR_DATA_LEN),  data_set.var_len(VAR_NAME_1));
-/// assert_eq!(Some(DataType::I32), data_set.var_data_type(VAR_NAME_1));
-/// assert_eq!(false,               data_set.has_var(VAR_NAME_2));
-/// assert_eq!(None,                data_set.var_len(VAR_NAME_2));
-/// assert_eq!(None,                data_set.var_data_type(VAR_NAME_2));
+/// assert_eq!(1,                               data_set.num_vars());
+/// assert_eq!(true,                            data_set.has_var(VAR_NAME_1));
+/// assert_eq!(Some(VAR_DATA_LEN),              data_set.var_len(VAR_NAME_1));
+/// assert_eq!(Some(DataType::I32),             data_set.var_data_type(VAR_NAME_1));
+/// assert_eq!(false,                           data_set.has_var(VAR_NAME_2));
+/// assert_eq!(None,                            data_set.var_len(VAR_NAME_2));
+/// assert_eq!(None,                            data_set.var_data_type(VAR_NAME_2));
 ///
 /// // Rename the variable
 /// data_set.rename_var(VAR_NAME_1, VAR_NAME_2).unwrap();
 ///
-/// assert_eq!(1,                   data_set.num_vars());
-/// assert_eq!(false,               data_set.has_var(VAR_NAME_1));
-/// assert_eq!(None,                data_set.var_len(VAR_NAME_1));
-/// assert_eq!(None,                data_set.var_data_type(VAR_NAME_1));
-/// assert_eq!(true,                data_set.has_var(VAR_NAME_2));
-/// assert_eq!(Some(VAR_DATA_LEN),  data_set.var_len(VAR_NAME_2));
-/// assert_eq!(Some(DataType::I32), data_set.var_data_type(VAR_NAME_2));
+/// assert_eq!(1,                               data_set.num_vars());
+/// assert_eq!(false,                           data_set.has_var(VAR_NAME_1));
+/// assert_eq!(None,                            data_set.var_len(VAR_NAME_1));
+/// assert_eq!(None,                            data_set.var_data_type(VAR_NAME_1));
+/// assert_eq!(true,                            data_set.has_var(VAR_NAME_2));
+/// assert_eq!(Some(VAR_DATA_LEN),              data_set.var_len(VAR_NAME_2));
+/// assert_eq!(Some(DataType::I32),             data_set.var_data_type(VAR_NAME_2));
 /// ```
 ///
 /// ## Remove a variable
@@ -101,18 +101,18 @@ use crate::io::compute_padding_size;
 /// data_set.add_fixed_dim(DIM_NAME, VAR_DATA_LEN).unwrap();
 /// data_set.add_var_i32::<&str>(VAR_NAME, &[DIM_NAME]).unwrap();
 ///
-/// assert_eq!(1,                   data_set.num_vars());
-/// assert_eq!(true,                data_set.has_var(VAR_NAME));
-/// assert_eq!(Some(VAR_DATA_LEN),  data_set.var_len(VAR_NAME));
-/// assert_eq!(Some(DataType::I32), data_set.var_data_type(VAR_NAME));
+/// assert_eq!(1,                               data_set.num_vars());
+/// assert_eq!(true,                            data_set.has_var(VAR_NAME));
+/// assert_eq!(Some(VAR_DATA_LEN),              data_set.var_len(VAR_NAME));
+/// assert_eq!(Some(DataType::I32),             data_set.var_data_type(VAR_NAME));
 ///
 /// // Remove the variable
 /// data_set.remove_var(VAR_NAME).unwrap();
 ///
-/// assert_eq!(0,       data_set.num_vars());
-/// assert_eq!(false,   data_set.has_var(VAR_NAME));
-/// assert_eq!(None,    data_set.var_len(VAR_NAME));
-/// assert_eq!(None,    data_set.var_data_type(VAR_NAME));
+/// assert_eq!(0,                               data_set.num_vars());
+/// assert_eq!(false,                           data_set.has_var(VAR_NAME));
+/// assert_eq!(None,                            data_set.var_len(VAR_NAME));
+/// assert_eq!(None,                            data_set.var_data_type(VAR_NAME));
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
@@ -121,7 +121,6 @@ pub struct Variable {
     pub(crate) dims: Vec<Rc<Dimension>>,
     pub(crate) attrs: Vec<Attribute>,
     pub(crate) data_type: DataType,
-    // pub(crate) data: Option<DataVector>,
 }
 
 impl Variable {
@@ -168,36 +167,11 @@ impl Variable {
     /// };
     ///
     /// let var: &Variable = data_set.get_var(VAR_NAME).unwrap();
-    /// assert_eq!(DataType::I32,       var.data_type());
+    /// assert_eq!(DataType::I32,               var.data_type());
     /// ```
     pub fn data_type(&self) -> DataType {
         return self.data_type.clone();
     }
-
-    // /// Returns `true` if the variable contains its typed data.
-    // ///
-    // /// # Example
-    // ///
-    // /// ```
-    // /// use netcdf3::{DataSet, Variable};
-    // /// const VAR_NAME: &str = "var_1";
-    // /// const DIM_NAME: &str = "dim_1";
-    // /// const DIM_SIZE: usize = 3;
-    // ///
-    // /// let mut data_set = DataSet::new();
-    // /// data_set.add_fixed_dim(DIM_NAME, DIM_SIZE).unwrap();
-    // /// data_set.add_var_i32(VAR_NAME, &[DIM_NAME]).unwrap();
-    // ///
-    // /// let var: &mut Variable = data_set.get_var_mut(VAR_NAME).unwrap();
-    // /// assert_eq!(false,                       var.has_data());
-    // /// assert_eq!(None,                        var.get_i32());
-    // /// var.set_i32(vec![1, 2, 3]).unwrap();
-    // /// assert_eq!(true,                        var.has_data());
-    // /// assert_eq!(Some(&[1, 2, 3][..]),        var.get_i32());
-    // /// ```
-    // pub fn has_data(&self) -> bool {
-    //     return self.data.is_some();
-    // }
 
     /// Returns the total number of elements.
     ///
@@ -296,12 +270,12 @@ impl Variable {
     /// let scalar_var_f32: &Variable = data_set.get_var(VAR_F32_NAME).unwrap();
     /// let scalar_var_f64: &Variable = data_set.get_var(VAR_F64_NAME).unwrap();
     ///
-    /// assert_eq!(4,       scalar_var_i8.chunk_size());
-    /// assert_eq!(4,       scalar_var_u8.chunk_size());
-    /// assert_eq!(4,       scalar_var_i16.chunk_size());
-    /// assert_eq!(4,       scalar_var_i32.chunk_size());
-    /// assert_eq!(4,       scalar_var_f32.chunk_size());
-    /// assert_eq!(8,       scalar_var_f64.chunk_size());
+    /// assert_eq!(4,           scalar_var_i8.chunk_size());
+    /// assert_eq!(4,           scalar_var_u8.chunk_size());
+    /// assert_eq!(4,           scalar_var_i16.chunk_size());
+    /// assert_eq!(4,           scalar_var_i32.chunk_size());
+    /// assert_eq!(4,           scalar_var_f32.chunk_size());
+    /// assert_eq!(8,           scalar_var_f64.chunk_size());
     /// ```
     pub fn chunk_size(&self) -> usize {
         let mut chunk_size = self.chunk_len() * self.data_type.size_of();

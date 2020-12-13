@@ -23,6 +23,8 @@ SCALAR_VARIABLES_FILE_NAME = "scalar_vars.nc"
 NC3_LIGHT_CLASSIC_FILE_NAME = "temp_3D_classic_light.nc"
 #: NetCDF-3 file containing a zero-sized unlimited dimension
 NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME = "zero_sized_unlimited_dim.nc"
+#: NetCDF-3 file containing default fill values (unset values).
+NC3_CONTAINING_DEFAULT_FILL_VALUES_FILE_NAME = "containing_default_fill_values.nc"
 
 
 def write_file_nc_fill_values(file_path: str):
@@ -89,7 +91,6 @@ def write_file_zero_sized_unlimited_dim(file_path: str):
     """
     with netCDF4.Dataset(file_path, format="NETCDF3_CLASSIC", mode="w") as ds:
         ds.createDimension("unlim_dim")
-
 
 def define_temperatures_dataset(ds):
 
@@ -230,6 +231,52 @@ def write_file_nc3_64bit_offset(file_path: str):
         define_temperatures_dataset(ds)
 
 
+def write_file_nc3_containing_default_fill_values(file_path: str):
+    """
+    Create a NetCDF3 file containing default `_FillValue`s of each data type.
+    """
+    def define_dataset_containing_default_fill_values(ds: netCDF4.Dataset):
+        DIM_NAME = "dimension_0"
+
+        ds.createDimension(DIM_NAME)
+
+        dim_var = ds.createVariable(DIM_NAME, datatype=np.int32, dimensions=DIM_NAME)
+        dim_var[:] = np.asarray([1, 2, 3], dtype=np.int32)
+
+        var_i8 = ds.createVariable("var_i8", datatype=np.int8, dimensions=DIM_NAME)
+        var_i8[0] = 1
+        # var_i8[1] = 2
+        var_i8[2] = 3
+
+        var_u8 = ds.createVariable("var_u8", datatype='c', dimensions=DIM_NAME)
+        var_u8[0] = b'\x01'
+        # var_u8[1] = b'\x02'
+        var_u8[2] = b'\x03'
+
+        var_i16 = ds.createVariable("var_i16", datatype=np.int16, dimensions=DIM_NAME)
+        var_i16[0] = 1
+        # var_i16[1] = 2
+        var_i16[2] = 3
+
+        var_i32 = ds.createVariable("var_i32", datatype=np.int32, dimensions=DIM_NAME)
+        var_i32[0] = 1
+        # var_i32[1] = 2
+        var_i32[2] = 3
+
+        var_f32 = ds.createVariable("var_f32", datatype=np.float32, dimensions=DIM_NAME)
+        var_f32[0] = 1.0
+        # var_f32[1] = 2.0
+        var_f32[2] = 3.0
+
+        var_f64 = ds.createVariable("var_f64", datatype=np.float64, dimensions=DIM_NAME)
+        var_f64[0] = 1.0
+        # var_f64[1] = 2.0
+        var_f64[2] = 3.0
+
+    with netCDF4.Dataset(file_path, format="NETCDF3_CLASSIC", mode="w") as ds:
+        define_dataset_containing_default_fill_values(ds)
+
+
 def init_parser():
     """
     Initialze the command line parser
@@ -270,3 +317,6 @@ if __name__ == "__main__":
 
     # Create another basic `NETCDF3_CLASSIC` data file
     write_file_zero_sized_unlimited_dim(os.path.join(output_dir, NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME))
+
+    # Create a data set containing the default `_FillValue` (unset values)
+    write_file_nc3_containing_default_fill_values(os.path.join(output_dir, NC3_CONTAINING_DEFAULT_FILL_VALUES_FILE_NAME))

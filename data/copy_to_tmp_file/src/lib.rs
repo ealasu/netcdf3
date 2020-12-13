@@ -3,7 +3,7 @@ use std::io::Write;
 use tempdir::TempDir;
 
 // Empty data set
-pub static EMPTY_DATA_SET_FILE_NAME: &'static str = "empty_data_set";
+pub static EMPTY_DATA_SET_FILE_NAME: &'static str = "empty_data_set.nc";
 pub static EMPTY_DATA_SET_FILE_BYTES: &'static[u8] = include_bytes!("../../empty_data_set.nc");
 
 // NetCDF-3 (classic version)
@@ -22,13 +22,17 @@ pub static NC3_FILL_VALUES_FILE_BYTES: &'static[u8] = include_bytes!("../../nc_f
 pub static SCALAR_VARIABLES_FILE_NAME: &'static str = "scalar_vars.nc";
 pub static SCALAR_VARIABLES_FILE_BYTES: &'static[u8] = include_bytes!("../../scalar_vars.nc");
 
-// Another light Classic NetCDF-3 file used by documention examples
+// Another Classic NetCDF-3 file (light version, used in the documention examples)
 pub static NC3_LIGHT_CLASSIC_FILE_NAME: &'static str = "temp_3D_classic_light.nc";
 pub static NC3_LIGHT_CLASSIC_FILE_BYTES: &'static[u8] = include_bytes!("../../temp_3D_classic_light.nc");
 
 // NetCDF-3 file containing a zero-sized unlimited dimension
 pub static NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME: &'static str = "zero_sized_unlimited_dim.nc";
 pub static NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_BYTES: &'static[u8] = include_bytes!("../../zero_sized_unlimited_dim.nc");
+
+// NetCDF-3 file containing default fill values (unset values)
+pub static NC3_CONTAINING_DEFAULT_FILL_VALUES_FILE_NAME: &'static str = "containing_default_fill_values.nc";
+pub static NC3_CONTAINING_DEFAULT_FILL_VALUES_FILE_BYTES: &'static[u8] = include_bytes!("../../containing_default_fill_values.nc");
 
 /// Copies bytes to a file located in a temporary directory.
 ///

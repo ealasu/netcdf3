@@ -4,15 +4,15 @@ use crate::DataType;
 
 /// NetCDF-3 attribute
 ///
-/// `Attribute` instances are managed by a [`DataSet`](struct.DataSet.html).
+/// `Attribute` instances are managed by the struct [`DataSet`](struct.DataSet.html).
 ///
-/// `DataSet`s allow to create, read, remove and rename `Attributes`s.
+/// `DataSet`s allow to create, get, remove and rename `Attribute`s.
 ///
 /// # Examples
 ///
 /// ## Global attributes
 ///
-/// ### Create and read a global attribute
+/// ### Create and get a global attribute
 ///
 /// ```
 /// use netcdf3::{DataSet, Attribute, DataType};
@@ -27,10 +27,10 @@ use crate::DataType;
 /// // Create a `i32` global attribute
 /// data_set.add_global_attr_i32(GLOBAL_ATTR_NAME, GLOBAL_ATTR_DATA.to_vec()).unwrap();
 ///
-/// assert_eq!(1,                       data_set.num_global_attrs());
-/// assert_eq!(true,                    data_set.has_global_attr(GLOBAL_ATTR_NAME));
-/// assert_eq!(Some(GLOBAL_ATTR_LEN),   data_set.get_global_attr_len(GLOBAL_ATTR_NAME));
-/// assert_eq!(Some(DataType::I32),     data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME));
+/// assert_eq!(1,                           data_set.num_global_attrs());
+/// assert_eq!(true,                        data_set.has_global_attr(GLOBAL_ATTR_NAME));
+/// assert_eq!(Some(GLOBAL_ATTR_LEN),       data_set.get_global_attr_len(GLOBAL_ATTR_NAME));
+/// assert_eq!(Some(DataType::I32),         data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME));
 ///
 /// // Get the `i32` stored values through the data set
 /// assert_eq!(None,                        data_set.get_global_attr_i8(GLOBAL_ATTR_NAME));
@@ -43,9 +43,9 @@ use crate::DataType;
 /// // Or through a reference to the global attribute
 /// let global_attr: &Attribute = data_set.get_global_attr(GLOBAL_ATTR_NAME).unwrap();
 ///
-/// assert_eq!(GLOBAL_ATTR_NAME,    global_attr.name());
-/// assert_eq!(GLOBAL_ATTR_LEN,     global_attr.len());
-/// assert_eq!(DataType::I32,       global_attr.data_type());
+/// assert_eq!(GLOBAL_ATTR_NAME,            global_attr.name());
+/// assert_eq!(GLOBAL_ATTR_LEN,             global_attr.len());
+/// assert_eq!(DataType::I32,               global_attr.data_type());
 ///
 /// assert_eq!(None,                        global_attr.get_i8());
 /// assert_eq!(None,                        global_attr.get_u8());
@@ -71,26 +71,28 @@ use crate::DataType;
 /// // Create a `i32` variable attribute
 /// data_set.add_global_attr_i32(GLOBAL_ATTR_NAME_1, GLOBAL_ATTR_DATA.to_vec()).unwrap();
 ///
-/// assert_eq!(1,                       data_set.num_global_attrs());
-/// assert_eq!(true,                    data_set.has_global_attr(GLOBAL_ATTR_NAME_1));
-/// assert_eq!(Some(GLOBAL_ATTR_LEN),   data_set.get_global_attr_len(GLOBAL_ATTR_NAME_1));
-/// assert_eq!(Some(DataType::I32),     data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME_1));
-/// assert_eq!(false,                   data_set.has_global_attr(GLOBAL_ATTR_NAME_2));
-/// assert_eq!(None,                    data_set.get_global_attr_len(GLOBAL_ATTR_NAME_2));
-/// assert_eq!(None,                    data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME_2));
+/// assert_eq!(1,                           data_set.num_global_attrs());
+/// assert_eq!(true,                        data_set.has_global_attr(GLOBAL_ATTR_NAME_1));
+/// assert_eq!(Some(GLOBAL_ATTR_LEN),       data_set.get_global_attr_len(GLOBAL_ATTR_NAME_1));
+/// assert_eq!(Some(DataType::I32),         data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME_1));
+/// assert_eq!(false,                       data_set.has_global_attr(GLOBAL_ATTR_NAME_2));
+/// assert_eq!(None,                        data_set.get_global_attr_len(GLOBAL_ATTR_NAME_2));
+/// assert_eq!(None,                        data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME_2));
 ///
 /// assert_eq!(Some(&GLOBAL_ATTR_DATA[..]), data_set.get_global_attr_i32(GLOBAL_ATTR_NAME_1));
 /// assert_eq!(None,                        data_set.get_global_attr_i32(GLOBAL_ATTR_NAME_2));
 ///
+/// // Rename the global attribute
 /// data_set.rename_global_attr(GLOBAL_ATTR_NAME_1, GLOBAL_ATTR_NAME_2).unwrap();
 ///
-/// assert_eq!(1,                       data_set.num_global_attrs());
-/// assert_eq!(false,                   data_set.has_global_attr(GLOBAL_ATTR_NAME_1));
-/// assert_eq!(None,                    data_set.get_global_attr_len(GLOBAL_ATTR_NAME_1));
-/// assert_eq!(None,                    data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME_1));
-/// assert_eq!(true,                    data_set.has_global_attr(GLOBAL_ATTR_NAME_2));
-/// assert_eq!(Some(GLOBAL_ATTR_LEN),   data_set.get_global_attr_len(GLOBAL_ATTR_NAME_2));
-/// assert_eq!(Some(DataType::I32),     data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME_2));
+/// // The global attribute has been renamed
+/// assert_eq!(1,                           data_set.num_global_attrs());
+/// assert_eq!(false,                       data_set.has_global_attr(GLOBAL_ATTR_NAME_1));
+/// assert_eq!(None,                        data_set.get_global_attr_len(GLOBAL_ATTR_NAME_1));
+/// assert_eq!(None,                        data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME_1));
+/// assert_eq!(true,                        data_set.has_global_attr(GLOBAL_ATTR_NAME_2));
+/// assert_eq!(Some(GLOBAL_ATTR_LEN),       data_set.get_global_attr_len(GLOBAL_ATTR_NAME_2));
+/// assert_eq!(Some(DataType::I32),         data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME_2));
 ///
 /// assert_eq!(None,                        data_set.get_global_attr_i32(GLOBAL_ATTR_NAME_1));
 /// assert_eq!(Some(&GLOBAL_ATTR_DATA[..]), data_set.get_global_attr_i32(GLOBAL_ATTR_NAME_2));
@@ -117,18 +119,20 @@ use crate::DataType;
 /// assert_eq!(Some(DataType::I32),         data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME));
 /// assert_eq!(Some(&GLOBAL_ATTR_DATA[..]), data_set.get_global_attr_i32(GLOBAL_ATTR_NAME));
 ///
+/// // Remove the global attribute
 /// data_set.remove_global_attr(GLOBAL_ATTR_NAME).unwrap();
 ///
-/// assert_eq!(0,      data_set.num_global_attrs());
-/// assert_eq!(false,  data_set.has_global_attr(GLOBAL_ATTR_NAME));
-/// assert_eq!(None,   data_set.get_global_attr_len(GLOBAL_ATTR_NAME));
-/// assert_eq!(None,   data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME));
-/// assert_eq!(None,   data_set.get_global_attr_i32(GLOBAL_ATTR_NAME));
+/// // The global attribute has been removed
+/// assert_eq!(0,                           data_set.num_global_attrs());
+/// assert_eq!(false,                       data_set.has_global_attr(GLOBAL_ATTR_NAME));
+/// assert_eq!(None,                        data_set.get_global_attr_len(GLOBAL_ATTR_NAME));
+/// assert_eq!(None,                        data_set.get_global_attr_data_type(GLOBAL_ATTR_NAME));
+/// assert_eq!(None,                        data_set.get_global_attr_i32(GLOBAL_ATTR_NAME));
 /// ```
 ///
 /// ## Variable attributes
 ///
-/// ### Create and read a variable attribute
+/// ### Create and get a variable attribute
 ///
 /// ```
 /// use netcdf3::{DataSet, Variable, Attribute, DataType, InvalidDataSet};
@@ -145,10 +149,10 @@ use crate::DataType;
 /// // Create a `i32` variable attribute
 /// data_set.add_var_attr_i32(VAR_NAME, VAR_ATTR_NAME, VAR_ATTR_DATA.to_vec()).unwrap();
 ///
-/// assert_eq!(Some(1),             data_set.num_var_attrs(VAR_NAME));
-/// assert_eq!(Some(true),          data_set.has_var_attr(VAR_NAME, VAR_ATTR_NAME));
-/// assert_eq!(Some(VAR_ATTR_DATA_LEN),  data_set.get_var_attr_len(VAR_NAME, VAR_ATTR_NAME));
-/// assert_eq!(Some(DataType::I32), data_set.get_var_attr_data_type(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(Some(1),                     data_set.num_var_attrs(VAR_NAME));
+/// assert_eq!(Some(true),                  data_set.has_var_attr(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(Some(VAR_ATTR_DATA_LEN),     data_set.get_var_attr_len(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(Some(DataType::I32),         data_set.get_var_attr_data_type(VAR_NAME, VAR_ATTR_NAME));
 ///
 /// // Get the `i32` stored values through the data set
 /// assert_eq!(None,                        data_set.get_var_attr_i8(VAR_NAME, VAR_ATTR_NAME));
@@ -241,11 +245,11 @@ use crate::DataType;
 /// // Remove the variable
 /// data_set.remove_var_attr(VAR_NAME, VAR_ATTR_NAME).unwrap();
 ///
-/// assert_eq!(Some(0),     data_set.num_var_attrs(VAR_NAME));
-/// assert_eq!(Some(false), data_set.has_var_attr(VAR_NAME, VAR_ATTR_NAME));
-/// assert_eq!(None,        data_set.get_var_attr_len(VAR_NAME, VAR_ATTR_NAME));
-/// assert_eq!(None,        data_set.get_var_attr_data_type(VAR_NAME, VAR_ATTR_NAME));
-/// assert_eq!(None,        data_set.get_var_attr_i32(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(Some(0),                     data_set.num_var_attrs(VAR_NAME));
+/// assert_eq!(Some(false),                 data_set.has_var_attr(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(None,                        data_set.get_var_attr_len(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(None,                        data_set.get_var_attr_data_type(VAR_NAME, VAR_ATTR_NAME));
+/// assert_eq!(None,                        data_set.get_var_attr_i32(VAR_NAME, VAR_ATTR_NAME));
 /// ```
 ///
 

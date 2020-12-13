@@ -6,13 +6,13 @@ use std::cell::RefCell;
 
 /// NetCDF-3 dimension
 ///
-/// `Dimension` instances are managed by a [`DataSet`](struct.DataSet.html).
+/// `Dimension` instances are managed by the struct [`DataSet`](struct.DataSet.html).
 ///
-/// `DataSet`s allow to create, read, remove and rename `Dimension`s.
+/// `DataSet`s allow to create, get, remove and rename `Dimension`s.
 ///
 /// # Examples
 ///
-/// ## Create and read *fixed-size* and *unlimited-size* dimensions
+/// ## Create and get *fixed-size* and *unlimited-size* dimensions
 ///
 /// ```
 /// use std::rc::Rc;
@@ -42,18 +42,18 @@ use std::cell::RefCell;
 ///
 /// // Or through references of the dimensions
 /// let dim_1: Rc<Dimension> = data_set.get_dim(DIM_NAME_1).unwrap();
-/// assert_eq!(DIM_NAME_1,                      dim_1.name());
-/// assert_eq!(DIM_SIZE_1,                      dim_1.size());
-/// assert_eq!(true,                            dim_1.is_unlimited());
-/// assert_eq!(false,                           dim_1.is_fixed());
-/// assert_eq!(DimensionType::UnlimitedSize,    dim_1.dim_type());
+/// assert_eq!(DIM_NAME_1,                          dim_1.name());
+/// assert_eq!(DIM_SIZE_1,                          dim_1.size());
+/// assert_eq!(true,                                dim_1.is_unlimited());
+/// assert_eq!(false,                               dim_1.is_fixed());
+/// assert_eq!(DimensionType::UnlimitedSize,        dim_1.dim_type());
 ///
 /// let dim_2: Rc<Dimension> = data_set.get_dim(DIM_NAME_2).unwrap();
-/// assert_eq!(DIM_NAME_2,                      dim_2.name());
-/// assert_eq!(DIM_SIZE_2,                      dim_2.size());
-/// assert_eq!(false,                           dim_2.is_unlimited());
-/// assert_eq!(true,                            dim_2.is_fixed());
-/// assert_eq!(DimensionType::FixedSize,        dim_2.dim_type());
+/// assert_eq!(DIM_NAME_2,                          dim_2.name());
+/// assert_eq!(DIM_SIZE_2,                          dim_2.size());
+/// assert_eq!(false,                               dim_2.is_unlimited());
+/// assert_eq!(true,                                dim_2.is_fixed());
+/// assert_eq!(DimensionType::FixedSize,            dim_2.dim_type());
 ///
 /// ```
 ///
@@ -72,26 +72,26 @@ use std::cell::RefCell;
 /// // Add a *fixed-size* dimension
 /// data_set.add_fixed_dim(DIM_NAME_1, DIM_SIZE).unwrap();
 ///
-/// assert_eq!(1,                               data_set.num_dims());
-/// assert_eq!(false,                           data_set.has_unlimited_dim());
-/// assert_eq!(true,                            data_set.has_dim(DIM_NAME_1));
-/// assert_eq!(Some(DIM_SIZE),                  data_set.dim_size(DIM_NAME_1));
-/// assert_eq!(Some(DimensionType::FixedSize),  data_set.dim_type(DIM_NAME_1));
-/// assert_eq!(false,                           data_set.has_dim(DIM_NAME_2));
-/// assert_eq!(None,                            data_set.dim_size(DIM_NAME_2));
-/// assert_eq!(None,                            data_set.dim_type(DIM_NAME_2));
+/// assert_eq!(1,                                   data_set.num_dims());
+/// assert_eq!(false,                               data_set.has_unlimited_dim());
+/// assert_eq!(true,                                data_set.has_dim(DIM_NAME_1));
+/// assert_eq!(Some(DIM_SIZE),                      data_set.dim_size(DIM_NAME_1));
+/// assert_eq!(Some(DimensionType::FixedSize),      data_set.dim_type(DIM_NAME_1));
+/// assert_eq!(false,                               data_set.has_dim(DIM_NAME_2));
+/// assert_eq!(None,                                data_set.dim_size(DIM_NAME_2));
+/// assert_eq!(None,                                data_set.dim_type(DIM_NAME_2));
 ///
 /// // Rename the *fixed-size* dimension
 /// data_set.rename_dim(DIM_NAME_1, DIM_NAME_2).unwrap();
 ///
-/// assert_eq!(1,                               data_set.num_dims());
-/// assert_eq!(false,                           data_set.has_unlimited_dim());
-/// assert_eq!(false,                           data_set.has_dim(DIM_NAME_1));
-/// assert_eq!(None,                            data_set.dim_size(DIM_NAME_1));
-/// assert_eq!(None,                            data_set.dim_type(DIM_NAME_1));
-/// assert_eq!(true,                            data_set.has_dim(DIM_NAME_2));
-/// assert_eq!(Some(DIM_SIZE),                  data_set.dim_size(DIM_NAME_2));
-/// assert_eq!(Some(DimensionType::FixedSize),  data_set.dim_type(DIM_NAME_2));
+/// assert_eq!(1,                                   data_set.num_dims());
+/// assert_eq!(false,                               data_set.has_unlimited_dim());
+/// assert_eq!(false,                               data_set.has_dim(DIM_NAME_1));
+/// assert_eq!(None,                                data_set.dim_size(DIM_NAME_1));
+/// assert_eq!(None,                                data_set.dim_type(DIM_NAME_1));
+/// assert_eq!(true,                                data_set.has_dim(DIM_NAME_2));
+/// assert_eq!(Some(DIM_SIZE),                      data_set.dim_size(DIM_NAME_2));
+/// assert_eq!(Some(DimensionType::FixedSize),      data_set.dim_type(DIM_NAME_2));
 /// ```
 ///
 /// ## Remove a dimension
@@ -118,11 +118,11 @@ use std::cell::RefCell;
 /// // Remove the *unlimited-size* dimension
 /// let _removed_dim: Rc<Dimension> = data_set.remove_dim(DIM_NAME).unwrap();
 ///
-/// assert_eq!(0,       data_set.num_dims());
-/// assert_eq!(false,   data_set.has_unlimited_dim());
-/// assert_eq!(false,   data_set.has_dim(DIM_NAME));
-/// assert_eq!(None,    data_set.dim_size(DIM_NAME));
-/// assert_eq!(None,    data_set.dim_type(DIM_NAME));
+/// assert_eq!(0,                                   data_set.num_dims());
+/// assert_eq!(false,                               data_set.has_unlimited_dim());
+/// assert_eq!(false,                               data_set.has_dim(DIM_NAME));
+/// assert_eq!(None,                                data_set.dim_size(DIM_NAME));
+/// assert_eq!(None,                                data_set.dim_type(DIM_NAME));
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Dimension {

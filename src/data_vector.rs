@@ -2,7 +2,6 @@ mod tests;
 
 use crate::DataType;
 
-#[derive(Debug, Clone, PartialEq)]
 /// Wraps the six NetCDF-3 data types.
 ///
 /// It allows to load variable data from files easily through the methods:
@@ -46,6 +45,7 @@ use crate::DataType;
 /// let latitude: Vec<f32> = latitude.get_f32_into().unwrap();
 /// assert_eq!(LATITUDE_VAR_DATA.to_vec(),      latitude);
 /// ```
+#[derive(Debug, Clone, PartialEq)]
 pub enum DataVector {
     I8(Vec<i8>),
     U8(Vec<u8>),

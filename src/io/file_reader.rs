@@ -111,6 +111,12 @@ use crate::{
 /// // Get the NetCDf-3 version
 /// // ------------------------
 /// assert_eq!(Version::Classic,                    file_reader.version());
+/// 
+//// // Get the global attributes
+/// // --------------------------
+/// assert_eq!(2,                                   data_set.num_global_attrs());
+/// assert_eq!("Example of NETCDF3_CLASSIC file",   data_set.get_global_attr_as_string("title").unwrap());
+/// assert_eq!("CF-1.8",                            data_set.get_global_attr_as_string("Conventions").unwrap());
 ///
 /// // Get the dimensions
 /// // ------------------
@@ -127,12 +133,6 @@ use crate::{
 /// assert_eq!(true,                                data_set.has_dim(TIME_DIM_NAME));
 /// assert_eq!(Some(TIME_VAR_LEN),                  data_set.dim_size(TIME_DIM_NAME));
 /// assert_eq!(Some(DimensionType::UnlimitedSize),  data_set.dim_type(TIME_DIM_NAME));
-///
-/// // Get the global attributes
-/// // --------------------------
-/// assert_eq!(2,                                   data_set.num_global_attrs());
-/// assert_eq!("Example of NETCDF3_CLASSIC file",   data_set.get_global_attr_as_string("title").unwrap());
-/// assert_eq!("CF-1.8",                            data_set.get_global_attr_as_string("Conventions").unwrap());
 ///
 /// // Get the variable definitions
 /// // ----------------------------
@@ -160,23 +160,48 @@ use crate::{
 ///
 /// // ...
 ///
-/// // Read all the variable data
-/// // --------------------------
-/// let var_data: HashMap<String, DataVector> = file_reader.read_all_vars().unwrap();
+/// // Read all the variables
+/// // ----------------------
+/// let variables: HashMap<String, DataVector> = file_reader.read_all_vars().unwrap();
 /// let data_set: &DataSet = file_reader.data_set();
-/// assert_eq!(9,                                   var_data.len());
+/// assert_eq!(9,                                   variables.len());
 ///
-/// assert_eq!(Some(&LATITUDE_VAR_DATA[..]),        var_data[LATITUDE_VAR_NAME].get_f32());
-/// assert_eq!(Some(&LONGITUDE_VAR_DATA[..]),       var_data[LONGITUDE_VAR_NAME].get_f32());
-/// assert_eq!(Some(&TIME_VAR_DATA[..]),            var_data[TIME_VAR_NAME].get_f32());
+/// 
+/// assert_eq!(true,                                variables.contains_key(LATITUDE_VAR_NAME));
+/// assert_eq!(DataType::F32,                       variables[LATITUDE_VAR_NAME].data_type());
+/// assert_eq!(Some(&LATITUDE_VAR_DATA[..]),        variables[LATITUDE_VAR_NAME].get_f32());
 ///
-/// assert_eq!(Some(&TEMP_I8_VAR_DATA[..]),         var_data[TEMP_I8_VAR_NAME].get_i8());
-/// assert_eq!(Some(&TEMP_U8_VAR_DATA[..]),         var_data[TEMP_U8_VAR_NAME].get_u8());
-/// assert_eq!(Some(&TEMP_I16_VAR_DATA[..]),        var_data[TEMP_I16_VAR_NAME].get_i16());
-/// assert_eq!(Some(&TEMP_I32_VAR_DATA[..]),        var_data[TEMP_I32_VAR_NAME].get_i32());
-/// assert_eq!(Some(&TEMP_F32_VAR_DATA[..]),        var_data[TEMP_F32_VAR_NAME].get_f32());
-/// assert_eq!(Some(&TEMP_F64_VAR_DATA[..]),        var_data[TEMP_F64_VAR_NAME].get_f64());
+/// assert_eq!(true,                                variables.contains_key(LONGITUDE_VAR_NAME));
+/// assert_eq!(DataType::F32,                       variables[LONGITUDE_VAR_NAME].data_type());
+/// assert_eq!(Some(&LONGITUDE_VAR_DATA[..]),       variables[LONGITUDE_VAR_NAME].get_f32());
+/// 
+/// assert_eq!(true,                                variables.contains_key(TIME_VAR_NAME));
+/// assert_eq!(DataType::F32,                       variables[TIME_VAR_NAME].data_type());
+/// assert_eq!(Some(&TIME_VAR_DATA[..]),            variables[TIME_VAR_NAME].get_f32());
+/// 
+/// assert_eq!(true,                                variables.contains_key(TEMP_I8_VAR_NAME));
+/// assert_eq!(DataType::I8,                        variables[TEMP_I8_VAR_NAME].data_type());
+/// assert_eq!(Some(&TEMP_I8_VAR_DATA[..]),         variables[TEMP_I8_VAR_NAME].get_i8());
+/// 
+/// assert_eq!(true,                                variables.contains_key(TEMP_U8_VAR_NAME));
+/// assert_eq!(DataType::U8,                        variables[TEMP_U8_VAR_NAME].data_type());
+/// assert_eq!(Some(&TEMP_U8_VAR_DATA[..]),         variables[TEMP_U8_VAR_NAME].get_u8());
+/// 
+/// assert_eq!(true,                                variables.contains_key(TEMP_I16_VAR_NAME));
+/// assert_eq!(DataType::I16,                       variables[TEMP_I16_VAR_NAME].data_type());
+/// assert_eq!(Some(&TEMP_I16_VAR_DATA[..]),        variables[TEMP_I16_VAR_NAME].get_i16());
+/// 
+/// assert_eq!(true,                                variables.contains_key(TEMP_I32_VAR_NAME));
+/// assert_eq!(DataType::I32,                       variables[TEMP_I32_VAR_NAME].data_type());
+/// assert_eq!(Some(&TEMP_I32_VAR_DATA[..]),        variables[TEMP_I32_VAR_NAME].get_i32());
+/// 
+/// assert_eq!(true,                                variables.contains_key(TEMP_F32_VAR_NAME));
+/// assert_eq!(DataType::F32,                       variables[TEMP_F32_VAR_NAME].data_type());
+/// assert_eq!(Some(&TEMP_F32_VAR_DATA[..]),        variables[TEMP_F32_VAR_NAME].get_f32());
 ///
+/// assert_eq!(true,                                variables.contains_key(TEMP_F64_VAR_NAME));
+/// assert_eq!(DataType::F64,                       variables[TEMP_F64_VAR_NAME].data_type());
+/// assert_eq!(Some(&TEMP_F64_VAR_DATA[..]),        variables[TEMP_F64_VAR_NAME].get_f64());
 /// // ...
 /// # tmp_dir.close();
 /// ```
@@ -188,8 +213,47 @@ pub struct FileReader {
     vars_info: Vec<VariableParsedMetadata>
 }
 
+macro_rules! impl_read_typed_var {
+    ($func_name:ident, $prim_type:ty, $data_type:path, $data_vector:path) => {
+        /// Reads the typed variable and returns its values into a typed `Vec`.
+        pub fn $func_name(&mut self, var_name: &str) -> Result<Vec<$prim_type>, ReadError> {
+            let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
+                ReadError::VariableNotDefined(String::from(var_name))
+            })?;
+            if var.data_type != $data_type {
+                return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: $data_type});
+            }
+            let data_vec: DataVector = self.read_var(var_name)?;
+            match data_vec {
+                $data_vector(data) => return Ok(data),
+                _ => return Err(ReadError::Unexpected),  // previously checked
+            }
+        }
+    };
+}
+
+macro_rules! impl_read_typed_record {
+    ($func_name:ident, $prim_type:ty, $data_type:path, $data_vector:path) => {
+        /// Reads the typed records and returns its values into a typed`Vec`.
+        pub fn $func_name(&mut self, var_name: &str, record_index: usize) -> Result<Vec<$prim_type>, ReadError>
+        {
+            let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
+                ReadError::VariableNotDefined(String::from(var_name))
+            })?;
+            if var.data_type != $data_type {
+                return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: $data_type});
+            }
+            let data_vec: DataVector = self.read_record(var_name, record_index)?;
+            match data_vec {
+                $data_vector(data) => return Ok(data),
+                _ => return Err(ReadError::Unexpected),  // previously checked
+            };
+        }
+    };
+}
 
 impl FileReader {
+
 
     /// Returns the data set managed by the reader.
     pub fn data_set(&self) -> &DataSet {
@@ -256,7 +320,7 @@ impl FileReader {
             }).collect()
     }
 
-    /// Reads data of one variable easily and stored them in a `DataVector`.
+    /// Reads the typed variable and returns its values into `Vec`.
     ///
     /// # Example
     ///
@@ -277,162 +341,33 @@ impl FileReader {
     ///
     /// let mut file_reader: FileReader = FileReader::open(input_file_path).unwrap();
     ///
-    /// // Read data from the NetCDF-3 file
-    /// // --------------------------------
+    /// // Open the file
+    /// // -------------
     /// assert_eq!(true,                    file_reader.data_set().has_var(LATITUDE_VAR_NAME));
     /// assert_eq!(Some(DataType::F32),     file_reader.data_set().var_data_type(LATITUDE_VAR_NAME));
     ///
-    /// let data_vec: DataVector = file_reader.read_var(LATITUDE_VAR_NAME).unwrap();
-    /// assert_eq!(DataType::F32,                           data_vec.data_type());
-    ///
-    /// assert_eq!(None,                                    data_vec.get_i8());
-    /// assert_eq!(None,                                    data_vec.get_u8());
-    /// assert_eq!(None,                                    data_vec.get_i16());
-    /// assert_eq!(None,                                    data_vec.get_i32());
-    /// assert_eq!(Some(&LATITUDE_VAR_DATA[..]),            data_vec.get_f32());
-    /// assert_eq!(None,                                    data_vec.get_f64());
+    /// // Read the variable
+    /// // -----------------
+    /// // using the method `FileReader::read_var`
+    /// {
+    ///     let latitudes: DataVector = file_reader.read_var(LATITUDE_VAR_NAME).unwrap();
+    ///     assert_eq!(DataType::F32,                           latitudes.data_type());
+    /// 
+    ///     assert_eq!(None,                                    latitudes.get_i8());
+    ///     assert_eq!(None,                                    latitudes.get_u8());
+    ///     assert_eq!(None,                                    latitudes.get_i16());
+    ///     assert_eq!(None,                                    latitudes.get_i32());
+    ///     assert_eq!(Some(&LATITUDE_VAR_DATA[..]),            latitudes.get_f32());
+    ///     assert_eq!(None,                                    latitudes.get_f64());
+    /// }
+    /// 
+    /// // using the method `FileReader::read_var_f32`
+    /// {
+    ///     let latitudes: Vec<f32> = file_reader.read_var_f32(LATITUDE_VAR_NAME).unwrap();
+    ///     assert_eq!(&LATITUDE_VAR_DATA[..],                  &latitudes[..]);
+    /// }
     /// ```
     pub fn read_var(&mut self, var_name: &str) -> Result<DataVector, ReadError>
-    {
-        let (_var_index, _var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
-            ReadError::VariableNotDefined(String::from(var_name))
-        })?;
-        let data_vec: DataVector = self._read_var(var_name)?;
-        Ok(data_vec)
-    }
-
-    /// Read `i8` data from the file and returns them in a `Vec<i8>`
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use netcdf3::{FileReader, DataSet, Variable, DataType};
-    ///
-    /// const TEMP_I8_VAR_NAME: &str = "temperature_i8";
-    /// const TEMP_I8_VAR_DATA: [i8; 30] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
-    ///
-    /// // ...
-    /// # use copy_to_tmp_file::{
-    /// #     copy_bytes_to_tmp_file,
-    /// #     NC3_CLASSIC_FILE_NAME, NC3_CLASSIC_FILE_BYTES,
-    /// # };
-    /// #
-    /// # // Copy bytes to an temporary file
-    /// # let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
-    ///
-    /// // Read some variable data from the file
-    /// // -------------------------------------
-    /// let mut file_reader: FileReader = FileReader::open(input_file_path).unwrap();
-    ///
-    /// assert_eq!(true,                                    file_reader.data_set().has_var(TEMP_I8_VAR_NAME));
-    /// assert_eq!(Some(DataType::I8),                      file_reader.data_set().var_data_type(TEMP_I8_VAR_NAME));
-    ///
-    /// let temperature: Vec<i8> = file_reader.read_var_to_i8(TEMP_I8_VAR_NAME).unwrap();
-    /// assert_eq!(TEMP_I8_VAR_DATA.to_vec(),              temperature);
-    /// ```
-    pub fn read_var_to_i8(&mut self, var_name: &str) -> Result<Vec<i8>, ReadError> {
-        let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
-            ReadError::VariableNotDefined(String::from(var_name))
-        })?;
-        if var.data_type != DataType::I8 {
-            return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: DataType::I8});
-        }
-        let data_vec: DataVector = self._read_var(var_name)?;
-        match data_vec {
-            DataVector::I8(data) => return Ok(data),
-            _ => return Err(ReadError::Unexpected),  // previously checked
-        }
-    }
-
-    /// Read `u8` data from the file and returns them in a `Vec<u8>`
-    ///
-    /// Also see the method [read_var_to_i8](struct.FileReader.html#method.read_var_to_i8).
-    pub fn read_var_to_u8(&mut self, var_name: &str) -> Result<Vec<u8>, ReadError> {
-        let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
-            ReadError::VariableNotDefined(String::from(var_name))
-        })?;
-        if var.data_type != DataType::U8 {
-            return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: DataType::U8});
-        }
-        let data_vec: DataVector = self._read_var(var_name)?;
-        match data_vec {
-            DataVector::U8(data) => return Ok(data),
-            _ => return Err(ReadError::Unexpected),  // previously checked
-        }
-    }
-
-    /// Read `i16` data from the file and returns them in a `Vec<i16>`
-    ///
-    /// Also see the method [read_var_to_i8](struct.FileReader.html#method.read_var_to_i8).
-    pub fn read_var_to_i16(&mut self, var_name: &str) -> Result<Vec<i16>, ReadError> {
-        let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
-            ReadError::VariableNotDefined(String::from(var_name))
-        })?;
-        if var.data_type != DataType::I16 {
-            return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: DataType::I16});
-        }
-        let data_vec: DataVector = self._read_var(var_name)?;
-        match data_vec {
-            DataVector::I16(data) => return Ok(data),
-            _ => return Err(ReadError::Unexpected),  // previously checked
-        }
-    }
-
-    /// Read `i32` data from the file and returns them in a `Vec<i32>`
-    ///
-    /// Also see the method [read_var_to_i8](struct.FileReader.html#method.read_var_to_i8).
-    pub fn read_var_to_i32(&mut self, var_name: &str) -> Result<Vec<i32>, ReadError> {
-        let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
-            ReadError::VariableNotDefined(String::from(var_name))
-        })?;
-        if var.data_type != DataType::I32 {
-            return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: DataType::I32});
-        }
-        let data_vec: DataVector = self._read_var(var_name)?;
-        match data_vec {
-            DataVector::I32(data) => return Ok(data),
-            _ => return Err(ReadError::Unexpected),  // previously checked
-        }
-    }
-
-    /// Read `f32` data from the file and returns them in a `Vec<f32>`
-    ///
-    /// Also see the method [read_var_to_i8](struct.FileReader.html#method.read_var_to_i8).
-    pub fn read_var_to_f32(&mut self, var_name: &str) -> Result<Vec<f32>, ReadError> {
-        let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
-            ReadError::VariableNotDefined(String::from(var_name))
-        })?;
-        if var.data_type != DataType::F32 {
-            return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: DataType::F32});
-        }
-        let data_vec: DataVector = self._read_var(var_name)?;
-        match data_vec {
-            DataVector::F32(data) => return Ok(data),
-            _ => return Err(ReadError::Unexpected),  // previously checked
-        }
-    }
-
-    /// Read `f64` data from the file and returns them in a `Vec<f64>`
-    ///
-    /// Also see the method [read_var_to_i8](struct.FileReader.html#method.read_var_to_i8).
-    pub fn read_var_to_f64(&mut self, var_name: &str) -> Result<Vec<f64>, ReadError> {
-        let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
-            ReadError::VariableNotDefined(String::from(var_name))
-        })?;
-        if var.data_type != DataType::F64 {
-            return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: DataType::F64});
-        }
-        let data_vec: DataVector = self._read_var(var_name)?;
-        match data_vec {
-            DataVector::F64(data) => return Ok(data),
-            _ => return Err(ReadError::Unexpected),  // previously checked
-        }
-    }
-
-    /// Reads one variable from the file and stored it into the data set.
-    ///
-    /// See the method [read_vars](struct.FileReader.html#method.read_vars).
-    fn _read_var(&mut self, var_name: &str) -> Result<DataVector, ReadError>
     {
         let (_, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
             ReadError::VariableNotDefined(String::from(var_name))
@@ -489,6 +424,50 @@ impl FileReader {
         }
         Ok(data_vec)
     }
+
+    impl_read_typed_var!(read_var_i8, i8, DataType::I8, DataVector::I8);
+    impl_read_typed_var!(read_var_u8, u8, DataType::U8, DataVector::U8);
+    impl_read_typed_var!(read_var_i16, i16, DataType::I16, DataVector::I16);
+    impl_read_typed_var!(read_var_i32, i32, DataType::I32, DataVector::I32);
+    impl_read_typed_var!(read_var_f32, f32, DataType::F32, DataVector::F32);
+    impl_read_typed_var!(read_var_f64, f64, DataType::F64, DataVector::F64);
+
+    /// Reads the typed records and returns its values into a typed`Vec`.
+    pub fn read_record(&mut self, var_name: &str, record_index: usize) -> Result<DataVector, ReadError>
+    {
+        let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
+            ReadError::VariableNotDefined(String::from(var_name))
+        })?;
+        let num_records: usize = self.data_set.num_records().unwrap_or(1); // fixed-size variables haves exaclty one record
+        if record_index >= num_records {
+            return Err(ReadError::RecordIndexExceeded{index: record_index, num_records: num_records});
+        }
+
+        // Compute the record offset from the start of the NetCDF3 file
+        let var_info: &VariableParsedMetadata = self.find_var_info(var_name).ok_or(ReadError::Unexpected)?;
+        let record_offset: u64 = (i64::from(var_info.begin_offset.clone()) as u64) + ((record_index * self.data_set.record_size().unwrap_or(0)) as u64);
+        self.input_file.seek(SeekFrom::Start(record_offset))?;
+
+        // Read the data
+        let data_type: DataType = var.data_type();
+        let mut data_vec: DataVector = DataVector::new(data_type, var.chunk_len());
+        match data_vec {
+            DataVector::I8(ref mut data) => self.input_file.read_i8_into(&mut data[..]),
+            DataVector::U8(ref mut data) => self.input_file.read_exact(&mut data[..]),
+            DataVector::I16(ref mut data) => self.input_file.read_i16_into::<BigEndian>(&mut data[..]),
+            DataVector::I32(ref mut data) => self.input_file.read_i32_into::<BigEndian>(&mut data[..]),
+            DataVector::F32(ref mut data) => self.input_file.read_f32_into::<BigEndian>(&mut data[..]),
+            DataVector::F64(ref mut data) => self.input_file.read_f64_into::<BigEndian>(&mut data[..]),
+        }?;
+        return Ok(data_vec);
+    }
+
+    impl_read_typed_record!(read_record_i8, i8, DataType::I8, DataVector::I8);
+    impl_read_typed_record!(read_record_u8, u8, DataType::U8, DataVector::U8);
+    impl_read_typed_record!(read_record_i16, i16, DataType::I16, DataVector::I16);
+    impl_read_typed_record!(read_record_i32, i32, DataType::I32, DataVector::I32);
+    impl_read_typed_record!(read_record_f32, f32, DataType::F32, DataVector::F32);
+    impl_read_typed_record!(read_record_f64, f64, DataType::F64, DataVector::F64);
 
     /// Parses the NetCDF-3 header
     fn parse_header(input: &[u8], total_file_size: u64) -> Result<(DataSet, Version, Vec<VariableParsedMetadata>), ReadError> {
@@ -870,3 +849,5 @@ struct VariableParsedMetadata {
     _chunk_size: Option<usize>,
     begin_offset: Offset,
 }
+
+

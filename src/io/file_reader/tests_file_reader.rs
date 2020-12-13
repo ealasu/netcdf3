@@ -2,7 +2,7 @@
 use byteorder::{WriteBytesExt, BigEndian};
 
 use crate::{
-    FileReader, DataSet, DataType, DimensionType,
+    FileReader, Variable, DataSet, DataType, DimensionType,
     error::ReadError,
     error::parse_header_error::{ParseHeaderError, ParseHeaderErrorKind, InvalidBytes},
     io::compute_padding_size,
@@ -36,7 +36,7 @@ const TEMP_F64_VAR_DATA: [f64; 30] = [0., 1., 2., 3., 4., 5., 6., 7., 8., 9., 10
 
 
 #[test]
-fn test_file_reader_read_var_to_i8() {
+fn test_file_reader_read_var_i8() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
     
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -47,31 +47,31 @@ fn test_file_reader_read_var_to_i8() {
         assert_eq!(Some(DataType::I8),              data_set.var_data_type(TEMP_I8_VAR_NAME));
     }
     
-    assert_eq!(Ok(TEMP_I8_VAR_DATA.to_vec()), file_reader.read_var_to_i8(TEMP_I8_VAR_NAME));
+    assert_eq!(Ok(TEMP_I8_VAR_DATA.to_vec()), file_reader.read_var_i8(TEMP_I8_VAR_NAME));
     
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::I8},
-        file_reader.read_var_to_i8(TEMP_U8_VAR_NAME).unwrap_err()
+        file_reader.read_var_i8(TEMP_U8_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::I8},
-        file_reader.read_var_to_i8(TEMP_I16_VAR_NAME).unwrap_err()
+        file_reader.read_var_i8(TEMP_I16_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::I8},
-        file_reader.read_var_to_i8(TEMP_I32_VAR_NAME).unwrap_err()
+        file_reader.read_var_i8(TEMP_I32_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::I8},
-        file_reader.read_var_to_i8(TEMP_F32_VAR_NAME).unwrap_err()
+        file_reader.read_var_i8(TEMP_F32_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::I8},
-        file_reader.read_var_to_i8(TEMP_F64_VAR_NAME).unwrap_err()
+        file_reader.read_var_i8(TEMP_F64_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableNotDefined(String::from("undef_var")),
-        file_reader.read_var_to_u8("undef_var").unwrap_err()
+        file_reader.read_var_u8("undef_var").unwrap_err()
     );
     
     let data_set: DataSet = file_reader.close().0;
@@ -82,7 +82,7 @@ fn test_file_reader_read_var_to_i8() {
 }
 
 #[test]
-fn test_file_reader_read_var_to_u8() {
+fn test_file_reader_read_var_u8() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
     
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -93,31 +93,31 @@ fn test_file_reader_read_var_to_u8() {
         assert_eq!(Some(DataType::U8),              data_set.var_data_type(TEMP_U8_VAR_NAME));
     }
     
-    assert_eq!(Ok(TEMP_U8_VAR_DATA.to_vec()), file_reader.read_var_to_u8(TEMP_U8_VAR_NAME));
+    assert_eq!(Ok(TEMP_U8_VAR_DATA.to_vec()), file_reader.read_var_u8(TEMP_U8_VAR_NAME));
     
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::U8},
-        file_reader.read_var_to_u8(TEMP_I8_VAR_NAME).unwrap_err()
+        file_reader.read_var_u8(TEMP_I8_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::U8},
-        file_reader.read_var_to_u8(TEMP_I16_VAR_NAME).unwrap_err()
+        file_reader.read_var_u8(TEMP_I16_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::U8},
-        file_reader.read_var_to_u8(TEMP_I32_VAR_NAME).unwrap_err()
+        file_reader.read_var_u8(TEMP_I32_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::U8},
-        file_reader.read_var_to_u8(TEMP_F32_VAR_NAME).unwrap_err()
+        file_reader.read_var_u8(TEMP_F32_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::U8},
-        file_reader.read_var_to_u8(TEMP_F64_VAR_NAME).unwrap_err()
+        file_reader.read_var_u8(TEMP_F64_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableNotDefined(String::from("undef_var")),
-        file_reader.read_var_to_u8("undef_var").unwrap_err()
+        file_reader.read_var_u8("undef_var").unwrap_err()
     );
     
     let data_set: DataSet = file_reader.close().0;
@@ -128,7 +128,7 @@ fn test_file_reader_read_var_to_u8() {
 }
 
 #[test]
-fn test_file_reader_read_var_to_i16() {
+fn test_file_reader_read_var_i16() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
     
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -139,31 +139,31 @@ fn test_file_reader_read_var_to_i16() {
         assert_eq!(Some(DataType::I16),             data_set.var_data_type(TEMP_I16_VAR_NAME));
     }
     
-    assert_eq!(Ok(TEMP_I16_VAR_DATA.to_vec()),      file_reader.read_var_to_i16(TEMP_I16_VAR_NAME));
+    assert_eq!(Ok(TEMP_I16_VAR_DATA.to_vec()),      file_reader.read_var_i16(TEMP_I16_VAR_NAME));
     
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::I16},
-        file_reader.read_var_to_i16(TEMP_I8_VAR_NAME).unwrap_err()
+        file_reader.read_var_i16(TEMP_I8_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::I16},
-        file_reader.read_var_to_i16(TEMP_U8_VAR_NAME).unwrap_err()
+        file_reader.read_var_i16(TEMP_U8_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::I16},
-        file_reader.read_var_to_i16(TEMP_I32_VAR_NAME).unwrap_err()
+        file_reader.read_var_i16(TEMP_I32_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::I16},
-        file_reader.read_var_to_i16(TEMP_F32_VAR_NAME).unwrap_err()
+        file_reader.read_var_i16(TEMP_F32_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::I16},
-        file_reader.read_var_to_i16(TEMP_F64_VAR_NAME).unwrap_err()
+        file_reader.read_var_i16(TEMP_F64_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableNotDefined(String::from("undef_var")),
-        file_reader.read_var_to_i16("undef_var").unwrap_err()
+        file_reader.read_var_i16("undef_var").unwrap_err()
     );
     
     let data_set: DataSet = file_reader.close().0;
@@ -173,7 +173,7 @@ fn test_file_reader_read_var_to_i16() {
 }
 
 #[test]
-fn test_file_reader_read_var_to_i32() {
+fn test_file_reader_read_var_i32() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
     
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -184,31 +184,31 @@ fn test_file_reader_read_var_to_i32() {
         assert_eq!(Some(DataType::I32),             data_set.var_data_type(TEMP_I32_VAR_NAME));
     }
     
-    assert_eq!(Ok(TEMP_I32_VAR_DATA.to_vec()),      file_reader.read_var_to_i32(TEMP_I32_VAR_NAME));
+    assert_eq!(Ok(TEMP_I32_VAR_DATA.to_vec()),      file_reader.read_var_i32(TEMP_I32_VAR_NAME));
     
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::I32},
-        file_reader.read_var_to_i32(TEMP_I8_VAR_NAME).unwrap_err()
+        file_reader.read_var_i32(TEMP_I8_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::I32},
-        file_reader.read_var_to_i32(TEMP_U8_VAR_NAME).unwrap_err()
+        file_reader.read_var_i32(TEMP_U8_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::I32},
-        file_reader.read_var_to_i32(TEMP_I16_VAR_NAME).unwrap_err()
+        file_reader.read_var_i32(TEMP_I16_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::I32},
-        file_reader.read_var_to_i32(TEMP_F32_VAR_NAME).unwrap_err()
+        file_reader.read_var_i32(TEMP_F32_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::I32},
-        file_reader.read_var_to_i32(TEMP_F64_VAR_NAME).unwrap_err()
+        file_reader.read_var_i32(TEMP_F64_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableNotDefined(String::from("undef_var")),
-        file_reader.read_var_to_i32("undef_var").unwrap_err()
+        file_reader.read_var_i32("undef_var").unwrap_err()
     );
     
     let data_set: DataSet = file_reader.close().0;
@@ -218,7 +218,7 @@ fn test_file_reader_read_var_to_i32() {
 }
 
 #[test]
-fn test_file_reader_read_var_to_f32() {
+fn test_file_reader_read_var_f32() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
     
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -229,31 +229,31 @@ fn test_file_reader_read_var_to_f32() {
         assert_eq!(Some(DataType::F32),             data_set.var_data_type(TEMP_F32_VAR_NAME));
     }
     
-    assert_eq!(Ok(TEMP_F32_VAR_DATA.to_vec()),      file_reader.read_var_to_f32(TEMP_F32_VAR_NAME));
+    assert_eq!(Ok(TEMP_F32_VAR_DATA.to_vec()),      file_reader.read_var_f32(TEMP_F32_VAR_NAME));
     
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::F32},
-        file_reader.read_var_to_f32(TEMP_I8_VAR_NAME).unwrap_err()
+        file_reader.read_var_f32(TEMP_I8_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::F32},
-        file_reader.read_var_to_f32(TEMP_U8_VAR_NAME).unwrap_err()
+        file_reader.read_var_f32(TEMP_U8_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::F32},
-        file_reader.read_var_to_f32(TEMP_I16_VAR_NAME).unwrap_err()
+        file_reader.read_var_f32(TEMP_I16_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::F32},
-        file_reader.read_var_to_f32(TEMP_I32_VAR_NAME).unwrap_err()
+        file_reader.read_var_f32(TEMP_I32_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::F32},
-        file_reader.read_var_to_f32(TEMP_F64_VAR_NAME).unwrap_err()
+        file_reader.read_var_f32(TEMP_F64_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableNotDefined(String::from("undef_var")),
-        file_reader.read_var_to_f32("undef_var").unwrap_err()
+        file_reader.read_var_f32("undef_var").unwrap_err()
     );
     
     let data_set: DataSet = file_reader.close().0;
@@ -263,7 +263,7 @@ fn test_file_reader_read_var_to_f32() {
 }
 
 #[test]
-fn test_file_reader_read_var_to_f64() {
+fn test_file_reader_read_var_f64() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
     
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -274,31 +274,31 @@ fn test_file_reader_read_var_to_f64() {
         assert_eq!(Some(DataType::F64),             data_set.var_data_type(TEMP_F64_VAR_NAME));
     }
     
-    assert_eq!(Ok(TEMP_F64_VAR_DATA.to_vec()),      file_reader.read_var_to_f64(TEMP_F64_VAR_NAME));
+    assert_eq!(Ok(TEMP_F64_VAR_DATA.to_vec()),      file_reader.read_var_f64(TEMP_F64_VAR_NAME));
     
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::F64},
-        file_reader.read_var_to_f64(TEMP_I8_VAR_NAME).unwrap_err()
+        file_reader.read_var_f64(TEMP_I8_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::F64},
-        file_reader.read_var_to_f64(TEMP_U8_VAR_NAME).unwrap_err()
+        file_reader.read_var_f64(TEMP_U8_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::F64},
-        file_reader.read_var_to_f64(TEMP_I16_VAR_NAME).unwrap_err()
+        file_reader.read_var_f64(TEMP_I16_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::F64},
-        file_reader.read_var_to_f64(TEMP_I32_VAR_NAME).unwrap_err()
+        file_reader.read_var_f64(TEMP_I32_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::F64},
-        file_reader.read_var_to_f64(TEMP_F32_VAR_NAME).unwrap_err()
+        file_reader.read_var_f64(TEMP_F32_VAR_NAME).unwrap_err()
     );
     assert_eq!(
         ReadError::VariableNotDefined(String::from("undef_var")),
-        file_reader.read_var_to_f64("undef_var").unwrap_err()
+        file_reader.read_var_f64("undef_var").unwrap_err()
     );
     
     let data_set: DataSet = file_reader.close().0;
@@ -1043,4 +1043,359 @@ fn test_read_indeterminated_num_records() {
         assert_eq!(original_dataset.record_size(),                      modified_dataset.record_size());
         assert_eq!(original_dataset.num_records(),                      modified_dataset.num_records())
     }
+}
+
+
+#[test]
+fn test_file_reader_read_record_i8() {
+    let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
+    
+    let mut file_reader = FileReader::open(input_data_file_path).unwrap();
+    
+    {
+        let data_set: &DataSet = file_reader.data_set();
+        assert_eq!(true,                            data_set.has_var(TEMP_I8_VAR_NAME));
+        assert_eq!(Some(DataType::I8),              data_set.var_data_type(TEMP_I8_VAR_NAME));
+        let var: &Variable = data_set.get_var(TEMP_I8_VAR_NAME).unwrap();
+        assert_eq!(DataType::I8,                    var.data_type());
+        assert_eq!(true,                            var.is_record_var());
+        assert_eq!(2,                               var.num_chunks());
+        assert_eq!(15,                              var.chunk_len());
+        assert_eq!(30,                              var.len());
+        assert_eq!(TEMP_I8_VAR_DATA.len(),          var.len());
+    }
+    let num_records = file_reader.data_set().num_records().unwrap();
+    assert_eq!(2,                                       num_records);
+
+    // Read the 1st record 
+    assert_eq!(Ok(TEMP_I8_VAR_DATA[0..15].to_vec()),    file_reader.read_record_i8(TEMP_I8_VAR_NAME, 0));
+    // Read the 2nd records
+    assert_eq!(Ok(TEMP_I8_VAR_DATA[15..30].to_vec()),   file_reader.read_record_i8(TEMP_I8_VAR_NAME, 1));
+    assert_eq!(
+        ReadError::RecordIndexExceeded{index: 2, num_records: num_records},
+        file_reader.read_record_i8(TEMP_I8_VAR_NAME, num_records).unwrap_err(),
+    );
+    
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::I8},
+        file_reader.read_record_i8(TEMP_U8_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::I8},
+        file_reader.read_record_i8(TEMP_I16_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::I8},
+        file_reader.read_record_i8(TEMP_I32_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::I8},
+        file_reader.read_record_i8(TEMP_F32_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::I8},
+        file_reader.read_record_i8(TEMP_F64_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableNotDefined(String::from("undef_var")),
+        file_reader.read_record_i8("undef_var", 0).unwrap_err()
+    );
+    
+    let _ = file_reader.close();
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_file_reader_read_record_u8() {
+    let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
+    
+    let mut file_reader = FileReader::open(input_data_file_path).unwrap();
+    
+    {
+        let data_set: &DataSet = file_reader.data_set();
+        assert_eq!(true,                            data_set.has_var(TEMP_U8_VAR_NAME));
+        assert_eq!(Some(DataType::U8),              data_set.var_data_type(TEMP_U8_VAR_NAME));
+        let var: &Variable = data_set.get_var(TEMP_U8_VAR_NAME).unwrap();
+        assert_eq!(DataType::U8,                    var.data_type());
+        assert_eq!(true,                            var.is_record_var());
+        assert_eq!(2,                               var.num_chunks());
+        assert_eq!(15,                              var.chunk_len());
+        assert_eq!(30,                              var.len());
+        assert_eq!(TEMP_U8_VAR_DATA.len(),          var.len());
+    }
+    let num_records = file_reader.data_set().num_records().unwrap();
+    assert_eq!(2,                                       num_records);
+
+    // Read the 1st record 
+    assert_eq!(Ok(TEMP_U8_VAR_DATA[0..15].to_vec()),    file_reader.read_record_u8(TEMP_U8_VAR_NAME, 0));
+    // Read the 2nd records
+    assert_eq!(Ok(TEMP_U8_VAR_DATA[15..30].to_vec()),   file_reader.read_record_u8(TEMP_U8_VAR_NAME, 1));
+    assert_eq!(
+        ReadError::RecordIndexExceeded{index: 2, num_records: num_records},
+        file_reader.read_record_u8(TEMP_U8_VAR_NAME, num_records).unwrap_err(),
+    );
+    
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::U8},
+        file_reader.read_record_u8(TEMP_I8_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::U8},
+        file_reader.read_record_u8(TEMP_I16_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::U8},
+        file_reader.read_record_u8(TEMP_I32_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::U8},
+        file_reader.read_record_u8(TEMP_F32_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::U8},
+        file_reader.read_record_u8(TEMP_F64_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableNotDefined(String::from("undef_var")),
+        file_reader.read_record_u8("undef_var", 0).unwrap_err()
+    );
+    
+    let _ = file_reader.close();
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_file_reader_read_record_i16() {
+    let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
+    
+    let mut file_reader = FileReader::open(input_data_file_path).unwrap();
+    
+    {
+        let data_set: &DataSet = file_reader.data_set();
+        assert_eq!(true,                            data_set.has_var(TEMP_I16_VAR_NAME));
+        assert_eq!(Some(DataType::I16),             data_set.var_data_type(TEMP_I16_VAR_NAME));
+        let var: &Variable = data_set.get_var(TEMP_I16_VAR_NAME).unwrap();
+        assert_eq!(DataType::I16,                   var.data_type());
+        assert_eq!(true,                            var.is_record_var());
+        assert_eq!(2,                               var.num_chunks());
+        assert_eq!(15,                              var.chunk_len());
+        assert_eq!(30,                              var.len());
+        assert_eq!(TEMP_I16_VAR_DATA.len(),         var.len());
+    }
+    let num_records = file_reader.data_set().num_records().unwrap();
+    assert_eq!(2,                                       num_records);
+
+    // Read the 1st record 
+    assert_eq!(Ok(TEMP_I16_VAR_DATA[0..15].to_vec()),   file_reader.read_record_i16(TEMP_I16_VAR_NAME, 0));
+    // Read the 2nd records
+    assert_eq!(Ok(TEMP_I16_VAR_DATA[15..30].to_vec()),  file_reader.read_record_i16(TEMP_I16_VAR_NAME, 1));
+    assert_eq!(
+        ReadError::RecordIndexExceeded{index: 2, num_records: num_records},
+        file_reader.read_record_i16(TEMP_I16_VAR_NAME, num_records).unwrap_err(),
+    );
+    
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::I16},
+        file_reader.read_record_i16(TEMP_I8_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::I16},
+        file_reader.read_record_i16(TEMP_U8_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::I16},
+        file_reader.read_record_i16(TEMP_I32_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::I16},
+        file_reader.read_record_i16(TEMP_F32_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::I16},
+        file_reader.read_record_i16(TEMP_F64_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableNotDefined(String::from("undef_var")),
+        file_reader.read_record_i16("undef_var", 0).unwrap_err()
+    );
+    
+    let _ = file_reader.close();
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_file_reader_read_record_i32() {
+    let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
+    
+    let mut file_reader = FileReader::open(input_data_file_path).unwrap();
+    
+    {
+        let data_set: &DataSet = file_reader.data_set();
+        assert_eq!(true,                            data_set.has_var(TEMP_I32_VAR_NAME));
+        assert_eq!(Some(DataType::I32),             data_set.var_data_type(TEMP_I32_VAR_NAME));
+        let var: &Variable = data_set.get_var(TEMP_I32_VAR_NAME).unwrap();
+        assert_eq!(DataType::I32,                   var.data_type());
+        assert_eq!(true,                            var.is_record_var());
+        assert_eq!(2,                               var.num_chunks());
+        assert_eq!(15,                              var.chunk_len());
+        assert_eq!(30,                              var.len());
+        assert_eq!(TEMP_I32_VAR_DATA.len(),         var.len());
+    }
+    let num_records = file_reader.data_set().num_records().unwrap();
+    assert_eq!(2,                                       num_records);
+
+    // Read the 1st record 
+    assert_eq!(Ok(TEMP_I32_VAR_DATA[0..15].to_vec()),   file_reader.read_record_i32(TEMP_I32_VAR_NAME, 0));
+    // Read the 2nd records
+    assert_eq!(Ok(TEMP_I32_VAR_DATA[15..30].to_vec()),  file_reader.read_record_i32(TEMP_I32_VAR_NAME, 1));
+    assert_eq!(
+        ReadError::RecordIndexExceeded{index: 2, num_records: num_records},
+        file_reader.read_record_i32(TEMP_I32_VAR_NAME, num_records).unwrap_err(),
+    );
+    
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::I32},
+        file_reader.read_record_i32(TEMP_I8_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::I32},
+        file_reader.read_record_i32(TEMP_U8_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::I32},
+        file_reader.read_record_i32(TEMP_I16_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::I32},
+        file_reader.read_record_i32(TEMP_F32_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::I32},
+        file_reader.read_record_i32(TEMP_F64_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableNotDefined(String::from("undef_var")),
+        file_reader.read_record_i32("undef_var", 0).unwrap_err()
+    );
+    
+    let _ = file_reader.close();
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_file_reader_read_record_f32() {
+    let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
+    
+    let mut file_reader = FileReader::open(input_data_file_path).unwrap();
+    
+    {
+        let data_set: &DataSet = file_reader.data_set();
+        assert_eq!(true,                            data_set.has_var(TEMP_F32_VAR_NAME));
+        assert_eq!(Some(DataType::F32),             data_set.var_data_type(TEMP_F32_VAR_NAME));
+        let var: &Variable = data_set.get_var(TEMP_F32_VAR_NAME).unwrap();
+        assert_eq!(DataType::F32,                   var.data_type());
+        assert_eq!(true,                            var.is_record_var());
+        assert_eq!(2,                               var.num_chunks());
+        assert_eq!(15,                              var.chunk_len());
+        assert_eq!(30,                              var.len());
+        assert_eq!(TEMP_F32_VAR_DATA.len(),         var.len());
+    }
+    let num_records = file_reader.data_set().num_records().unwrap();
+    assert_eq!(2,                                       num_records);
+
+    // Read the 1st record 
+    assert_eq!(Ok(TEMP_F32_VAR_DATA[0..15].to_vec()),   file_reader.read_record_f32(TEMP_F32_VAR_NAME, 0));
+    // Read the 2nd records
+    assert_eq!(Ok(TEMP_F32_VAR_DATA[15..30].to_vec()),  file_reader.read_record_f32(TEMP_F32_VAR_NAME, 1));
+    assert_eq!(
+        ReadError::RecordIndexExceeded{index: 2, num_records: num_records},
+        file_reader.read_record_f32(TEMP_F32_VAR_NAME, num_records).unwrap_err(),
+    );
+    
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::F32},
+        file_reader.read_record_f32(TEMP_I8_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::F32},
+        file_reader.read_record_f32(TEMP_U8_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::F32},
+        file_reader.read_record_f32(TEMP_I16_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::F32},
+        file_reader.read_record_f32(TEMP_I32_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F64_VAR_NAME), req: DataType::F64, get: DataType::F32},
+        file_reader.read_record_f32(TEMP_F64_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableNotDefined(String::from("undef_var")),
+        file_reader.read_record_f32("undef_var", 0).unwrap_err()
+    );
+    
+    let _ = file_reader.close();
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_file_reader_read_record_f64() {
+    let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
+    
+    let mut file_reader = FileReader::open(input_data_file_path).unwrap();
+    
+    {
+        let data_set: &DataSet = file_reader.data_set();
+        assert_eq!(true,                            data_set.has_var(TEMP_F64_VAR_NAME));
+        assert_eq!(Some(DataType::F64),             data_set.var_data_type(TEMP_F64_VAR_NAME));
+        let var: &Variable = data_set.get_var(TEMP_F64_VAR_NAME).unwrap();
+        assert_eq!(DataType::F64,                   var.data_type());
+        assert_eq!(true,                            var.is_record_var());
+        assert_eq!(2,                               var.num_chunks());
+        assert_eq!(15,                              var.chunk_len());
+        assert_eq!(30,                              var.len());
+        assert_eq!(TEMP_F64_VAR_DATA.len(),         var.len());
+    }
+    let num_records = file_reader.data_set().num_records().unwrap();
+    assert_eq!(2,                                       num_records);
+
+    // Read the 1st record 
+    assert_eq!(Ok(TEMP_F64_VAR_DATA[0..15].to_vec()),   file_reader.read_record_f64(TEMP_F64_VAR_NAME, 0));
+    // Read the 2nd records
+    assert_eq!(Ok(TEMP_F64_VAR_DATA[15..30].to_vec()),  file_reader.read_record_f64(TEMP_F64_VAR_NAME, 1));
+    assert_eq!(
+        ReadError::RecordIndexExceeded{index: 2, num_records: num_records},
+        file_reader.read_record_f64(TEMP_F64_VAR_NAME, num_records).unwrap_err(),
+    );
+    
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I8_VAR_NAME), req: DataType::I8, get: DataType::F64},
+        file_reader.read_record_f64(TEMP_I8_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_U8_VAR_NAME), req: DataType::U8, get: DataType::F64},
+        file_reader.read_record_f64(TEMP_U8_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I16_VAR_NAME), req: DataType::I16, get: DataType::F64},
+        file_reader.read_record_f64(TEMP_I16_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_I32_VAR_NAME), req: DataType::I32, get: DataType::F64},
+        file_reader.read_record_f64(TEMP_I32_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableMismatchDataType{var_name: String::from(TEMP_F32_VAR_NAME), req: DataType::F32, get: DataType::F64},
+        file_reader.read_record_f64(TEMP_F32_VAR_NAME, 0).unwrap_err()
+    );
+    assert_eq!(
+        ReadError::VariableNotDefined(String::from("undef_var")),
+        file_reader.read_record_f64("undef_var", 0).unwrap_err()
+    );
+    
+    let _ = file_reader.close();
+    tmp_dir.close().unwrap();
 }

@@ -85,6 +85,7 @@ pub enum ReadError {
     VariableMismatchDataType{var_name: String, req: DataType, get: DataType},
     IOErrorKind(std::io::ErrorKind),
     ComputationNumberOfRecords,
+    RecordIndexExceeded{index: usize, num_records: usize},
     Unexpected,
 }
 
@@ -124,6 +125,8 @@ pub enum WriteError {
     ClassicVersionNotPossible,
     HeaderAlreadyDefined,
     HeaderNotDefined,
+    RecordIndexExceeded{index: usize, num_records: usize},
+    RecordMismatchDataLength{var_name: String, req: usize, get: usize},
     Unexpected,
 }
 

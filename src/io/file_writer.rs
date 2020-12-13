@@ -4,6 +4,7 @@ use std::io::{Write, Seek, SeekFrom};
 use std::rc::Rc;
 use std::path::{Path, PathBuf};
 use std::convert::TryFrom;
+use std::collections::BTreeSet;
 
 use crate::{DataSet, Version, Dimension, Attribute, DataType, Variable};
 use crate::io::Offset;
@@ -24,6 +25,140 @@ use crate::{
     NC_FILL_F32,
     NC_FILL_F64,
 };
+
+macro_rules! impl_write_typed_chunk {
+    ($func_name:ident, $prim_type:ty, $nc_fill_value:ident) => {
+        /// Write the `$prim_type` slice into the output stream.
+        fn $func_name<T: Write>(out_stream: &mut T, slice: &[$prim_type]) -> Result<usize, std::io::Error>
+        {
+            // Write the useful bytes
+            const SIZE_OF: usize = std::mem::size_of::<$prim_type>();
+            let mut bytes: [u8; SIZE_OF];
+            for value in slice.iter() {
+                bytes = value.to_be_bytes();
+                out_stream.write_all(&bytes)?;
+            }
+            let mut num_bytes: usize = slice.len() * std::mem::size_of::<$prim_type>();
+
+            // Write the padding bytes if necessary
+            let padding_size: usize = compute_padding_size(num_bytes);
+            if padding_size > 0 {
+                let nc_fill_bytes: [u8; SIZE_OF] = $nc_fill_value.to_be_bytes();
+                let padding_bytes: Vec<u8> = nc_fill_bytes.to_vec().into_iter().cycle().take(padding_size).collect();
+                out_stream.write_all(&padding_bytes)?;
+                num_bytes += padding_size;
+            }
+
+            // Return the number of written bytes
+            Ok(num_bytes)
+        }
+    }
+}
+
+macro_rules! impl_write_typed_var {
+    ($func_name:ident, $write_typed_chunk: path, $prim_type:ty, $data_type:path, $data_vector:path) => {
+        pub fn $func_name(&mut self, var_name: &str, data: &[$prim_type]) -> Result<(), WriteError> {
+            let header_def: &HeaderDefinition = self.header_def.as_ref().ok_or(WriteError::HeaderNotDefined)?;
+            let var: &Variable = header_def.data_set.find_var_from_name(var_name).map_err(|_err| WriteError::VariableNotDefined(var_name.to_owned()))?.1;
+            if var.data_type != $data_type {
+                return Err(WriteError::VariableMismatchDataType{var_name: var_name.to_owned(), req:var.data_type(), get: $data_type });
+            }
+            if var.len() != data.len() {
+                return Err(WriteError::VariableMismatchDataLength{var_name: var_name.to_owned(), req:var.len(), get: data.len()});
+            }
+            let var_metadata: &ComputedVariableMetadata = header_def.get_var_metadata(var)?;
+
+            // Write the `$prim_type` data
+            let begin_offset: u64 = i64::from(var_metadata.begin_offset.clone()) as u64;
+            match header_def.data_set.record_size() {
+                None => {  // fixed-size variable
+                    self.output_file.seek(SeekFrom::Start(begin_offset))?;
+                    let _chunk_size: usize = $write_typed_chunk(&mut self.output_file, data)?;
+                },
+                Some(record_size) => {  // record variable
+                    let num_chunks: usize = var.num_chunks();
+                    let chunk_len: usize = var.chunk_len();
+                    // Loop over data chunks
+                    for i in 0..num_chunks {
+                        let start: usize = i * chunk_len;
+                        let end: usize = (i + 1) * chunk_len;
+                        let chunk_slice: &[$prim_type] = &data[start..end];
+                        let position: u64 = begin_offset + ((i * record_size) as u64);
+                        self.output_file.seek(SeekFrom::Start(position))?;
+                        let _chunk_size: usize = $write_typed_chunk(&mut self.output_file, chunk_slice)?;
+                    }
+                }
+            }
+
+            // Save the records already written
+            let num_records: usize = header_def.data_set.num_records().unwrap_or(1);
+            self.written_records.push((var, (0..num_records).collect()));
+            Ok(())
+        }
+    };
+}
+
+macro_rules! impl_write_typed_record {
+    ($func_name:ident, $write_typed_chunk: path, $prim_type:ty, $data_type: path)=> {
+        pub fn $func_name(&mut self, var_name: &str, record_index: usize, record: &[$prim_type]) -> Result<(), WriteError> {
+            // Check that the defintion has been set
+            let header_def: &HeaderDefinition = self.header_def.as_ref().ok_or(WriteError::HeaderNotDefined)?;
+            // Check that the variable has been defined
+            let var: &Variable = header_def.data_set.find_var_from_name(var_name).map_err(|_err| WriteError::VariableNotDefined(var_name.to_owned()))?.1;
+            if var.data_type != $data_type {
+                return Err(WriteError::VariableMismatchDataType{var_name: var_name.to_owned(), req:var.data_type(), get: $data_type});
+            }
+            let num_records: usize = header_def.data_set.num_records().unwrap_or(1);
+            // Check the record index validity
+            if record_index >= num_records {
+                return Err(WriteError::RecordIndexExceeded{index: record_index, num_records: num_records});
+            }
+            // Check the length of the record
+            if record.len() != var.chunk_len() {
+                return Err(WriteError::RecordMismatchDataLength{var_name: var.name.clone(), req: var.chunk_len(), get: record.len()});
+            }
+            let var_metadata: &ComputedVariableMetadata = header_def.get_var_metadata(var)?;
+            let record_size: usize = header_def.data_set.record_size().unwrap_or(0);
+
+            // Set the output cursor to the record offset
+            let begin_offset: u64 = i64::from(var_metadata.begin_offset.clone()) as u64 + (record_size * record_index) as u64;
+            self.output_file.seek(SeekFrom::Start(begin_offset))?;
+            let _chunk_size: usize = $write_typed_chunk(&mut self.output_file, record)?;
+
+            // Save the written record
+            self.update_written_records(var, &[record_index][..])?;
+            Ok(())
+        }
+    };
+}
+
+macro_rules! impl_write_typed_chunk_nc_fill {
+    ($func_name: ident, $prim_type:ty, $nc_fill_value:path) => {
+        /// Fill the output stream with the default value [`$nc_fill_value`](constant.$nc_fill_value.html).
+        fn $func_name<T: Write>(out_stream: &mut T, num_values: usize) -> Result<usize, std::io::Error>
+        {
+            // Write the useful bytes
+            const SIZE_OF: usize = std::mem::size_of::<$prim_type>();
+            let bytes: [u8; SIZE_OF] = $nc_fill_value.to_be_bytes();
+            for _ in 0..num_values {
+                out_stream.write_all(&bytes)?;
+            }
+            let mut num_bytes: usize = num_values * std::mem::size_of::<$prim_type>();
+
+            // Write the padding bytes if necessary
+            let padding_size: usize = compute_padding_size(num_bytes);
+            if padding_size > 0 {
+                let nc_fill_bytes: [u8; SIZE_OF] = $nc_fill_value.to_be_bytes();
+                let padding_bytes: Vec<u8> = nc_fill_bytes.to_vec().into_iter().cycle().take(padding_size).collect();
+                out_stream.write_all(&padding_bytes)?;
+                num_bytes += padding_size;
+            }
+
+            // Return the number of written bytes
+            Ok(num_bytes)
+        }
+    };
+}
 
 /// Allows to write NetCDF-3 files (the *classic* and the *64-bit offset* versions).
 ///
@@ -76,16 +211,16 @@ use crate::{
 ///
 /// // Create and write the NetCDF-3 file
 /// // ----------------------------------
-/// assert_eq!(false,                           output_file_path.exists());
+/// assert_eq!(false,                                   output_file_path.exists());
 /// let mut file_writer: FileWriter = FileWriter::create_new(&output_file_path).unwrap();
 /// // Set the NetCDF-3 definition
 /// file_writer.set_def(&data_set, Version::Classic, 0).unwrap();
-/// assert_eq!(TEMPERATURE_VAR_LEN,             LATITUDE_VAR_LEN * LONGITUDE_VAR_LEN);
+/// assert_eq!(TEMPERATURE_VAR_LEN,                     LATITUDE_VAR_LEN * LONGITUDE_VAR_LEN);
 /// file_writer.write_var_f32(LATITUDE_VAR_NAME, &LATITUDE_VAR_DATA[..]).unwrap();
 /// file_writer.write_var_f32(LONGITUDE_VAR_NAME, &LONGITUDE_VAR_DATA[..]).unwrap();
 /// file_writer.write_var_f64(TEMPERATURE_VAR_NAME, &TEMPERATURE_DATA[..]).unwrap();
 /// file_writer.close().unwrap();
-/// assert_eq!(true,                            output_file_path.exists());
+/// assert_eq!(true,                                    output_file_path.exists());
 ///
 /// // Binary comparaison with the "same" NeTCDF-3 file created with the [Python library netCDF4](https://github.com/Unidata/netcdf4-python).
 /// // -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -96,15 +231,20 @@ use crate::{
 ///     written_bytes
 /// };
 /// # tmp_dir.close().unwrap();
-/// assert_eq!(NC3_LIGHT_CLASSIC_FILE_BYTES.len(),   nc3_file_bytes.len());
-/// assert_eq!(NC3_LIGHT_CLASSIC_FILE_BYTES,         &nc3_file_bytes[..]);
+/// assert_eq!(NC3_LIGHT_CLASSIC_FILE_BYTES.len(),      nc3_file_bytes.len());
+/// assert_eq!(NC3_LIGHT_CLASSIC_FILE_BYTES,            &nc3_file_bytes[..]);
 /// ```
 #[derive(Debug)]
-pub struct FileWriter<'a> {
+pub struct FileWriter<'a>
+{
+    /// Path of the output file
     output_file_path: PathBuf,
+    /// Opened file on the file system
     output_file: std::fs::File,
+    /// Defintion of the data set.
     header_def: Option<HeaderDefinition<'a>>,
-    written_vars: Vec<&'a Variable>,
+    /// List of already written records of each variable
+    written_records: Vec<(&'a Variable, BTreeSet<usize>)>,
 }
 
 impl<'a> FileWriter<'a> {
@@ -128,7 +268,7 @@ impl<'a> FileWriter<'a> {
             output_file: output_file,
             output_file_path: output_file_path,
             header_def: None,
-            written_vars: vec![],
+            written_records: vec![],
         })
     }
 
@@ -152,10 +292,11 @@ impl<'a> FileWriter<'a> {
             output_file: output_file,
             output_file_path: output_file_path,
             header_def: None,
-            written_vars: vec![],
+            written_records: vec![],
         })
     }
 
+    /// Path of the output file.
     pub fn file_path(&self) -> &Path {
         return &self.output_file_path;
     }
@@ -237,14 +378,31 @@ impl<'a> FileWriter<'a> {
             None => return Ok(()),
             Some(ref header_def) => header_def,
         };
-        let not_written_vars: Vec<&'a Variable> = header_def.data_set.vars.iter().filter(|var: &&'a Variable| !self.written_vars.contains(var)).collect();
+        let num_records: usize = header_def.data_set.num_records().unwrap_or(1);
+        let all_records: BTreeSet<usize> = (0..num_records).collect();
+        let not_written_records: Vec<(&'a Variable, Vec<usize>)> = {
+            let num_vars = header_def.data_set.vars.len();
+            let mut not_written_records: Vec<(&'a Variable, Vec<usize>)> = Vec::with_capacity(num_vars);
+            for var in header_def.data_set.vars.iter() {
+                let written_records: Option<&BTreeSet<usize>> = self.written_records.iter()
+                    .find(|(var_2, _written_records): &&(&'a Variable, BTreeSet<usize>)| var == *var_2)
+                    .map(|(_var_2, written_records): &(&'a Variable, BTreeSet<_>)| written_records);
+                let not_written_record: Vec<usize> = match written_records {
+                    None => all_records.clone().into_iter().collect(),
+                    Some(written_records) => all_records.difference(&written_records).cloned().collect(),
+                };
+                not_written_records.push((var, not_written_record));
+            }
+            not_written_records
+        };
+
         let record_size: usize = header_def.data_set.record_size().unwrap_or(0);
-        for var in not_written_vars.into_iter() {
-            let num_chunks: usize = var.num_chunks();
+        for (var, not_written_records) in not_written_records.into_iter() {
+            // let num_chunks: usize = var.num_chunks();
             let chunk_len: usize = var.chunk_len();
             let var_metadata: &ComputedVariableMetadata = header_def.get_var_metadata(var)?;
             let begin_offset: usize = i64::from(var_metadata.begin_offset.clone()) as usize;
-            for i in 0..num_chunks {
+            for i in not_written_records.into_iter() {
                 let position: usize = begin_offset + (i * record_size);
                 self.output_file.seek(SeekFrom::Start(position as u64))?;
                 let _num_bytes: usize = match var.data_type() {
@@ -260,222 +418,50 @@ impl<'a> FileWriter<'a> {
         Ok(())
     }
 
-    pub fn write_var_i8(&mut self, var_name: &str, data: &[i8]) -> Result<(), WriteError> {
-        let header_def: &HeaderDefinition = self.header_def.as_ref().ok_or(WriteError::HeaderNotDefined)?;
-        let var: &Variable = header_def.data_set.find_var_from_name(var_name).map_err(|_err| WriteError::VariableNotDefined(var_name.to_owned()))?.1;
-        if var.data_type != DataType::I8 {
-            return Err(WriteError::VariableMismatchDataType{var_name: var_name.to_owned(), req:var.data_type(), get: DataType::I8});
-        }
-        if var.len() != data.len() {
-            return Err(WriteError::VariableMismatchDataLength{var_name: var_name.to_owned(), req:var.len(), get: data.len()});
-        }
-        let var_metadata: &ComputedVariableMetadata = header_def.get_var_metadata(var)?;
+    impl_write_typed_chunk!(write_chunk_i8, i8, NC_FILL_I8);
+    impl_write_typed_chunk!(write_chunk_u8, u8, NC_FILL_U8);
+    impl_write_typed_chunk!(write_chunk_i16, i16, NC_FILL_I16);
+    impl_write_typed_chunk!(write_chunk_i32, i32, NC_FILL_I32);
+    impl_write_typed_chunk!(write_chunk_f32, f32, NC_FILL_F32);
+    impl_write_typed_chunk!(write_chunk_f64, f64, NC_FILL_F64);
 
-        // Write the `i8` data
-        let begin_offset: u64 = i64::from(var_metadata.begin_offset.clone()) as u64;
-        match header_def.data_set.record_size() {
-            None => {  // fixed-size variable
-                self.output_file.seek(SeekFrom::Start(begin_offset))?;
-                let _chunk_size: usize = FileWriter::write_chunk_i8(&mut self.output_file, data)?;
-            },
-            Some(record_size) => {  // record variable
-                let num_chunks: usize = var.num_chunks();
-                let chunk_len: usize = var.chunk_len();
-                // Loop over data chunks
-                for i in 0..num_chunks {
-                    let start: usize = i * chunk_len;
-                    let end: usize = (i + 1) * chunk_len;
-                    let chunk_slice: &[i8] = &data[start..end];
-                    let position: u64 = begin_offset + ((i * record_size) as u64);
-                    self.output_file.seek(SeekFrom::Start(position))?;
-                    let _chunk_size: usize = FileWriter::write_chunk_i8(&mut self.output_file, chunk_slice)?;
-                }
-            }
+    impl_write_typed_var!(write_var_i8, FileWriter::write_chunk_i8, i8, DataType::I8, DataVector::I8);
+    impl_write_typed_var!(write_var_u8, FileWriter::write_chunk_u8, u8, DataType::U8, DataVector::U8);
+    impl_write_typed_var!(write_var_i16, FileWriter::write_chunk_i16, i16, DataType::I16, DataVector::I16);
+    impl_write_typed_var!(write_var_i32, FileWriter::write_chunk_i32, i32, DataType::I32, DataVector::I32);
+    impl_write_typed_var!(write_var_f32, FileWriter::write_chunk_f32, f32, DataType::F32, DataVector::F32);
+    impl_write_typed_var!(write_var_f64, FileWriter::write_chunk_f64, f64, DataType::F64, DataVector::F64);
+
+    impl_write_typed_record!(write_record_i8, FileWriter::write_chunk_i8, i8, DataType::I8);
+    impl_write_typed_record!(write_record_u8, FileWriter::write_chunk_u8, u8, DataType::U8);
+    impl_write_typed_record!(write_record_i16, FileWriter::write_chunk_i16, i16, DataType::I16);
+    impl_write_typed_record!(write_record_i32, FileWriter::write_chunk_i32, i32, DataType::I32);
+    impl_write_typed_record!(write_record_f32, FileWriter::write_chunk_f32, f32, DataType::F32);
+    impl_write_typed_record!(write_record_f64, FileWriter::write_chunk_f64, f64, DataType::F64);
+
+
+    impl_write_typed_chunk_nc_fill!(write_chunk_nc_fill_i8, i8, NC_FILL_I8);
+    impl_write_typed_chunk_nc_fill!(write_chunk_nc_fill_u8, u8, NC_FILL_U8);
+    impl_write_typed_chunk_nc_fill!(write_chunk_nc_fill_i16, i16, NC_FILL_I16);
+    impl_write_typed_chunk_nc_fill!(write_chunk_nc_fill_i32, i32, NC_FILL_I32);
+    impl_write_typed_chunk_nc_fill!(write_chunk_nc_fill_f32, f32, NC_FILL_F32);
+    impl_write_typed_chunk_nc_fill!(write_chunk_nc_fill_f64, f64, NC_FILL_F64);
+
+    fn update_written_records(&mut self, var: &'a Variable, records: &[usize]) -> Result<(), WriteError>
+    {
+        let mut records_set: BTreeSet<usize> = records.iter().map(|index: &usize| index.clone()).collect();
+        // Get already written records for the variable
+        let ref mut written_records: Option<&mut BTreeSet<usize>> = self.written_records.iter_mut()
+            .find(|(var_2, _written_records): &&mut (&'a Variable, BTreeSet<usize>)| var == *var_2)
+            .map(|(_var_2, written_records): &mut (&'a Variable, BTreeSet<usize>)| written_records);
+        // If at least one record has alredy been written
+        if let Some(ref mut already_written_records_set) = written_records {
+            already_written_records_set.append(&mut records_set);
+        } else {  // otherwise
+            self.written_records.push((var, records_set));
         }
-        self.written_vars.push(var);
         Ok(())
     }
-
-    pub fn write_var_u8(&mut self, var_name: &str, data: &[u8]) -> Result<(), WriteError> {
-        let header_def: &HeaderDefinition = self.header_def.as_ref().ok_or(WriteError::HeaderNotDefined)?;
-        let var: &Variable = header_def.data_set.find_var_from_name(var_name).map_err(|_err| WriteError::VariableNotDefined(var_name.to_owned()))?.1;
-        if var.data_type != DataType::U8 {
-            return Err(WriteError::VariableMismatchDataType{var_name: var_name.to_owned(), req:var.data_type(), get: DataType::U8});
-        }
-        if var.len() != data.len() {
-            return Err(WriteError::VariableMismatchDataLength{var_name: var_name.to_owned(), req:var.len(), get: data.len()});
-        }
-        let var_metadata: &ComputedVariableMetadata = header_def.get_var_metadata(var)?;
-
-        // Write the `u8` data
-        let begin_offset: u64 = i64::from(var_metadata.begin_offset.clone()) as u64;
-        match header_def.data_set.record_size() {
-            None => {  // fixed-size variable
-                self.output_file.seek(SeekFrom::Start(begin_offset))?;
-                let _chunk_size: usize = FileWriter::write_chunk_u8(&mut self.output_file, data)?;
-            },
-            Some(record_size) => {  // record variable
-                let num_chunks: usize = var.num_chunks();
-                let chunk_len: usize = var.chunk_len();
-                // Loop over data chunks
-                for i in 0..num_chunks {
-                    let start: usize = i * chunk_len;
-                    let end: usize = (i + 1) * chunk_len;
-                    let chunk_slice: &[u8] = &data[start..end];
-                    let position: u64 = begin_offset + ((i * record_size) as u64);
-                    self.output_file.seek(SeekFrom::Start(position))?;
-                    let _chunk_size: usize = FileWriter::write_chunk_u8(&mut self.output_file, chunk_slice)?;
-                }
-            }
-        }
-        self.written_vars.push(var);
-        Ok(())
-    }
-
-    pub fn write_var_i16(&mut self, var_name: &str, data: &[i16]) -> Result<(), WriteError> {
-        let header_def: &HeaderDefinition = self.header_def.as_ref().ok_or(WriteError::HeaderNotDefined)?;
-        let var: &Variable = header_def.data_set.find_var_from_name(var_name).map_err(|_err| WriteError::VariableNotDefined(var_name.to_owned()))?.1;
-        if var.data_type != DataType::I16 {
-            return Err(WriteError::VariableMismatchDataType{var_name: var_name.to_owned(), req:var.data_type(), get: DataType::I16});
-        }
-        if var.len() != data.len() {
-            return Err(WriteError::VariableMismatchDataLength{var_name: var_name.to_owned(), req:var.len(), get: data.len()});
-        }
-        let var_metadata: &ComputedVariableMetadata = header_def.get_var_metadata(var)?;
-
-        // Write the `i16` data
-        let begin_offset: u64 = i64::from(var_metadata.begin_offset.clone()) as u64;
-        match header_def.data_set.record_size() {
-            None => {  // fixed-size variable
-                self.output_file.seek(SeekFrom::Start(begin_offset))?;
-                let _chunk_size: usize = FileWriter::write_chunk_i16(&mut self.output_file, data)?;
-            },
-            Some(record_size) => {  // record variable
-                let num_chunks: usize = var.num_chunks();
-                let chunk_len: usize = var.chunk_len();
-                // Loop over data chunks
-                for i in 0..num_chunks {
-                    let start: usize = i * chunk_len;
-                    let end: usize = (i + 1) * chunk_len;
-                    let chunk_slice: &[i16] = &data[start..end];
-                    let position: u64 = begin_offset + ((i * record_size) as u64);
-                    self.output_file.seek(SeekFrom::Start(position))?;
-                    let _chunk_size: usize = FileWriter::write_chunk_i16(&mut self.output_file, chunk_slice)?;
-                }
-            }
-        }
-        self.written_vars.push(var);
-        Ok(())
-    }
-
-    pub fn write_var_i32(&mut self, var_name: &str, data: &[i32]) -> Result<(), WriteError> {
-        let header_def: &HeaderDefinition = self.header_def.as_ref().ok_or(WriteError::HeaderNotDefined)?;
-        let var: &Variable = header_def.data_set.find_var_from_name(var_name).map_err(|_err| WriteError::VariableNotDefined(var_name.to_owned()))?.1;
-        if var.data_type != DataType::I32 {
-            return Err(WriteError::VariableMismatchDataType{var_name: var_name.to_owned(), req:var.data_type(), get: DataType::I32});
-        }
-        if var.len() != data.len() {
-            return Err(WriteError::VariableMismatchDataLength{var_name: var_name.to_owned(), req:var.len(), get: data.len()});
-        }
-        let var_metadata: &ComputedVariableMetadata = header_def.get_var_metadata(var)?;
-
-        // Write the `i32` data
-        let begin_offset: u64 = i64::from(var_metadata.begin_offset.clone()) as u64;
-        match header_def.data_set.record_size() {
-            None => {  // fixed-size variable
-                self.output_file.seek(SeekFrom::Start(begin_offset))?;
-                let _chunk_size: usize = FileWriter::write_chunk_i32(&mut self.output_file, data)?;
-            },
-            Some(record_size) => {  // record variable
-                let num_chunks: usize = var.num_chunks();
-                let chunk_len: usize = var.chunk_len();
-                // Loop over data chunks
-                for i in 0..num_chunks {
-                    let start: usize = i * chunk_len;
-                    let end: usize = (i + 1) * chunk_len;
-                    let chunk_slice: &[i32] = &data[start..end];
-                    let position: u64 = begin_offset + ((i * record_size) as u64);
-                    self.output_file.seek(SeekFrom::Start(position))?;
-                    let _chunk_size: usize = FileWriter::write_chunk_i32(&mut self.output_file, chunk_slice)?;
-                }
-            }
-        }
-        self.written_vars.push(var);
-        Ok(())
-    }
-
-    pub fn write_var_f32(&mut self, var_name: &str, data: &[f32]) -> Result<(), WriteError> {
-        let header_def: &HeaderDefinition = self.header_def.as_ref().ok_or(WriteError::HeaderNotDefined)?;
-        let var: &Variable = header_def.data_set.find_var_from_name(var_name).map_err(|_err| WriteError::VariableNotDefined(var_name.to_owned()))?.1;
-        if var.data_type != DataType::F32 {
-            return Err(WriteError::VariableMismatchDataType{var_name: var_name.to_owned(), req:var.data_type(), get: DataType::F32});
-        }
-        if var.len() != data.len() {
-            return Err(WriteError::VariableMismatchDataLength{var_name: var_name.to_owned(), req:var.len(), get: data.len()});
-        }
-        let var_metadata: &ComputedVariableMetadata = header_def.get_var_metadata(var)?;
-
-        // Write the `f32` data
-        let begin_offset: u64 = i64::from(var_metadata.begin_offset.clone()) as u64;
-        match header_def.data_set.record_size() {
-            None => {  // fixed-size variable
-                self.output_file.seek(SeekFrom::Start(begin_offset))?;
-                let _chunk_size: usize = FileWriter::write_chunk_f32(&mut self.output_file, data)?;
-            },
-            Some(record_size) => {  // record variable
-                let num_chunks: usize = var.num_chunks();
-                let chunk_len: usize = var.chunk_len();
-                // Loop over data chunks
-                for i in 0..num_chunks {
-                    let start: usize = i * chunk_len;
-                    let end: usize = (i + 1) * chunk_len;
-                    let chunk_slice: &[f32] = &data[start..end];
-                    let position: u64 = begin_offset + ((i * record_size) as u64);
-                    self.output_file.seek(SeekFrom::Start(position))?;
-                    let _chunk_size: usize = FileWriter::write_chunk_f32(&mut self.output_file, chunk_slice)?;
-                }
-            }
-        }
-        self.written_vars.push(var);
-        Ok(())
-    }
-
-    pub fn write_var_f64(&mut self, var_name: &str, data: &[f64]) -> Result<(), WriteError> {
-        let header_def: &HeaderDefinition = self.header_def.as_ref().ok_or(WriteError::HeaderNotDefined)?;
-        let var: &Variable = header_def.data_set.find_var_from_name(var_name).map_err(|_err| WriteError::VariableNotDefined(var_name.to_owned()))?.1;
-        if var.data_type != DataType::F64 {
-            return Err(WriteError::VariableMismatchDataType{var_name: var_name.to_owned(), req:var.data_type(), get: DataType::F64});
-        }
-        if var.len() != data.len() {
-            return Err(WriteError::VariableMismatchDataLength{var_name: var_name.to_owned(), req:var.len(), get: data.len()});
-        }
-        let var_metadata: &ComputedVariableMetadata = header_def.get_var_metadata(var)?;
-
-        // Write the `f64` data
-        let begin_offset: u64 = i64::from(var_metadata.begin_offset.clone()) as u64;
-        match header_def.data_set.record_size() {
-            None => {  // fixed-size variable
-                self.output_file.seek(SeekFrom::Start(begin_offset))?;
-                let _chunk_size: usize = FileWriter::write_chunk_f64(&mut self.output_file, data)?;
-            },
-            Some(record_size) => {  // record variable
-                let num_chunks: usize = var.num_chunks();
-                let chunk_len: usize = var.chunk_len();
-                // Loop over data chunks
-                for i in 0..num_chunks {
-                    let start: usize = i * chunk_len;
-                    let end: usize = (i + 1) * chunk_len;
-                    let chunk_slice: &[f64] = &data[start..end];
-                    let position: u64 = begin_offset + ((i * record_size) as u64);
-                    self.output_file.seek(SeekFrom::Start(position))?;
-                    let _chunk_size: usize = FileWriter::write_chunk_f64(&mut self.output_file, chunk_slice)?;
-                }
-            }
-        }
-        self.written_vars.push(var);
-        Ok(())
-    }
-
 
     fn write_header(&mut self) -> Result<usize, WriteError>{
         let header_def: &HeaderDefinition = self.header_def.as_ref().ok_or(WriteError::HeaderNotDefined)?;
@@ -515,236 +501,6 @@ impl<'a> FileWriter<'a> {
         }
         Ok(num_bytes)
     }
-
-    /// Fill the output stream  with the default value [`NC_FILL_I8`](constant.NC_FILL_I8.html).
-    fn write_chunk_nc_fill_i8<T: Write>(out_stream: &mut T, num_values: usize) -> Result<usize, std::io::Error>
-    {
-        // Write the useful bytes
-        let bytes: [u8; 1] = NC_FILL_I8.to_be_bytes();
-        for _ in 0..num_values {
-            out_stream.write_all(&bytes)?;
-        }
-        let mut num_bytes: usize = num_values * std::mem::size_of::<i8>();
-
-        // Write the padding bytes if necessary
-        let padding_size: usize = compute_padding_size(num_bytes);
-        if padding_size > 0 {
-            let nc_fill_byte: [u8; 1] = NC_FILL_I8.to_be_bytes();
-            let padding_bytes: Vec<u8> = vec![nc_fill_byte[0]; padding_size];
-            out_stream.write_all(&padding_bytes)?;
-            num_bytes += padding_size;
-        }
-
-        // Return the number of written bytes
-        Ok(num_bytes)
-    }
-
-    /// Fill the output stream  with the default value [`NC_FILL_U8`](constant.NC_FILL_U8.html).
-    fn write_chunk_nc_fill_u8<T: Write>(out_stream: &mut T, num_values: usize) -> Result<usize, std::io::Error>
-    {
-        // Write the useful bytes
-        let bytes: [u8; 1] = NC_FILL_U8.to_be_bytes();
-        for _ in 0..num_values {
-            out_stream.write_all(&bytes)?;
-        }
-        let mut num_bytes: usize = num_values * std::mem::size_of::<u8>();
-
-        // Write the padding bytes if necessary
-        let padding_size: usize = compute_padding_size(num_bytes);
-        if padding_size > 0 {
-            let nc_fill_byte: [u8; 1] = NC_FILL_U8.to_be_bytes();
-            let padding_bytes: Vec<u8> = vec![nc_fill_byte[0]; padding_size];
-            out_stream.write_all(&padding_bytes)?;
-            num_bytes += padding_size;
-        }
-
-        // Return the number of written bytes
-        Ok(num_bytes)
-    }
-
-    /// Fill the output stream  with the default value [`NC_FILL_I16`](constant.NC_FILL_I16.html).
-    fn write_chunk_nc_fill_i16<T: Write>(out_stream: &mut T, num_values: usize) -> Result<usize, std::io::Error>
-    {
-        // Write the useful bytes
-        let bytes: [u8; 2] = NC_FILL_I16.to_be_bytes();
-        for _ in 0..num_values {
-            out_stream.write_all(&bytes)?;
-        }
-        let mut num_bytes: usize = num_values * std::mem::size_of::<i16>();
-
-        // Write the padding bytes if necessary
-        let padding_size: usize = compute_padding_size(num_bytes);
-        if padding_size == 2 {
-            let nc_fill_bytes: [u8; 2] = NC_FILL_I16.to_be_bytes();
-            let padding_bytes: Vec<u8> = nc_fill_bytes.to_vec().into_iter().cycle().take(padding_size).collect();
-            out_stream.write_all(&padding_bytes)?;
-            num_bytes += padding_size;
-        }
-
-
-        // Return the number of written bytes
-        Ok(num_bytes)
-    }
-
-    /// Fill the output stream  with the default value [`NC_FILL_I32`](constant.NC_FILL_I32.html).
-    fn write_chunk_nc_fill_i32<T: Write>(out_stream: &mut T, num_values: usize) -> Result<usize, std::io::Error>
-    {
-        // Write the useful bytes
-        let bytes: [u8; 4] = NC_FILL_I32.to_be_bytes();
-        for _ in 0..num_values {
-            out_stream.write_all(&bytes)?;
-        }
-        let num_bytes: usize = num_values * std::mem::size_of::<i32>();
-
-        // Return the number of written bytes
-        Ok(num_bytes)
-    }
-
-    /// Fill the output stream  with the default value [`NC_FILL_F32`](constant.NC_FILL_F32.html).
-    fn write_chunk_nc_fill_f32<T: Write>(out_stream: &mut T, num_values: usize) -> Result<usize, std::io::Error>
-    {
-        // Write the useful bytes
-        let bytes: [u8; 4] = NC_FILL_F32.to_be_bytes();
-        for _ in 0..num_values {
-            out_stream.write_all(&bytes)?;
-        }
-        let num_bytes: usize = num_values * std::mem::size_of::<f32>();
-
-        // Return the number of written bytes
-        Ok(num_bytes)
-    }
-
-    /// Fill the output stream with the default value [`NC_FILL_F64`](constant.NC_FILL_F64.html).
-    fn write_chunk_nc_fill_f64<T: Write>(out_stream: &mut T, num_values: usize) -> Result<usize, std::io::Error>
-    {
-        // Write the useful bytes
-        let bytes: [u8; 8] = NC_FILL_F64.to_be_bytes();
-        for _ in 0..num_values {
-            out_stream.write_all(&bytes)?;
-        }
-        let num_bytes: usize = num_values * std::mem::size_of::<f64>();
-
-        // Return the number of written bytes
-        Ok(num_bytes)
-    }
-
-    /// Write the `i8` slice into the output stream.
-    fn write_chunk_i8<T: Write>(out_stream: &mut T, slice: &[i8]) -> Result<usize, std::io::Error>
-    {
-        // Write the useful bytes
-        let mut bytes: [u8; 1];
-        for value in slice.iter() {
-            bytes = value.to_be_bytes();
-            out_stream.write_all(&bytes)?;
-        }
-        let mut num_bytes: usize = slice.len() * std::mem::size_of::<i8>();
-
-        // Write the padding bytes if necessary
-        let padding_size: usize = compute_padding_size(num_bytes);
-        if padding_size > 0 {
-            let nc_fill_byte: [u8; 1] = NC_FILL_I8.to_be_bytes();
-            let padding_bytes: Vec<u8> = vec![nc_fill_byte[0]; padding_size];
-            out_stream.write_all(&padding_bytes)?;
-            num_bytes += padding_size;
-        }
-
-        // Return the number of written bytes
-        Ok(num_bytes)
-    }
-
-    /// Write the `u8` slice into the output stream.
-    fn write_chunk_u8<T: Write>(out_stream: &mut T, slice: &[u8]) -> Result<usize, std::io::Error>
-    {
-        // Write the useful bytes
-        let mut bytes: [u8; 1];
-        for value in slice.iter() {
-            bytes = value.to_be_bytes();
-            out_stream.write_all(&bytes)?;
-        }
-        let mut num_bytes: usize = slice.len() * std::mem::size_of::<u8>();
-
-        // Write the padding bytes if necessary
-        let padding_size: usize = compute_padding_size(num_bytes);
-        if padding_size > 0 {
-            let nc_fill_byte: [u8; 1] = NC_FILL_U8.to_be_bytes();
-            let padding_bytes: Vec<u8> = vec![nc_fill_byte[0]; padding_size];
-            out_stream.write_all(&padding_bytes)?;
-            num_bytes += padding_size;
-        }
-
-        // Return the number of written bytes
-        Ok(num_bytes)
-    }
-
-    /// Write the `i16` slice into the output stream.
-    fn write_chunk_i16<T: Write>(out_stream: &mut T, slice: &[i16]) -> Result<usize, std::io::Error>
-    {
-        // Write the useful bytes
-        let mut bytes: [u8; 2];
-        for value in slice.iter() {
-            bytes = value.to_be_bytes();
-            out_stream.write_all(&bytes)?;
-        }
-        let mut num_bytes: usize = slice.len() * std::mem::size_of::<i16>();
-
-        // Write the padding bytes if necessary
-        let padding_size: usize = compute_padding_size(num_bytes);
-        if padding_size == 2 {
-            let nc_fill_bytes: [u8; 2] = NC_FILL_I16.to_be_bytes();
-            let padding_bytes: Vec<u8> = nc_fill_bytes.to_vec().into_iter().cycle().take(padding_size).collect();
-            out_stream.write_all(&padding_bytes)?;
-            num_bytes += padding_size;
-        }
-
-        // Return the number of written bytes
-        Ok(num_bytes)
-    }
-
-    /// Write the `i32` slice into the output stream.
-    fn write_chunk_i32<T: Write>(out_stream: &mut T, slice: &[i32]) -> Result<usize, std::io::Error>
-    {
-        // Write the useful bytes
-        let mut bytes: [u8; 4];
-        for value in slice.iter() {
-            bytes = value.to_be_bytes();
-            out_stream.write_all(&bytes)?;
-        }
-        let num_bytes: usize = slice.len() * std::mem::size_of::<i32>();
-
-        // Return the number of written bytes
-        Ok(num_bytes)
-    }
-
-    /// Write the `f32` slice into the output stream.
-    fn write_chunk_f32<T: Write>(out_stream: &mut T, slice: &[f32]) -> Result<usize, std::io::Error>
-    {
-        // Write the useful bytes
-        let mut bytes: [u8; 4];
-        for value in slice.iter() {
-            bytes = value.to_be_bytes();
-            out_stream.write_all(&bytes)?;
-        }
-        let num_bytes: usize = slice.len() * std::mem::size_of::<f32>();
-
-        // Return the number of written bytes
-        Ok(num_bytes)
-    }
-
-    /// Write the `f64` slice into the output stream.
-    fn write_chunk_f64<T: Write>(out_stream: &mut T, slice: &[f64]) -> Result<usize, std::io::Error>
-    {
-        // Write the useful bytes
-        let mut bytes: [u8; 8];
-        for value in slice.iter() {
-            bytes = value.to_be_bytes();
-            out_stream.write_all(&bytes)?;
-        }
-        let num_bytes: usize = slice.len() * std::mem::size_of::<f64>();
-
-        // Return the number of written bytes
-        Ok(num_bytes)
-    }
-
 
     fn write_name_string<T: Write>(out_stream: &mut T, name: &str) -> Result<usize, std::io::Error> {
         let name_bytes: &[u8] = name.as_bytes();
@@ -918,9 +674,9 @@ impl<'a> FileWriter<'a> {
 struct HeaderDefinition<'a> {
     /// A reference to the written data set
     data_set: &'a DataSet,
-    /// NetCDF-3 version of the output
+    /// NetCDF-3 version of file
     version: Version,
-    /// Minimum size (number of bytes) of the header
+    /// Minimum number of bytes required for the header
     header_min_size: usize,
     /// Computed data set meta data
     data_set_metadata: ComputedDataSetMetadata<'a>,
@@ -953,8 +709,6 @@ struct  ComputedDataSetMetadata<'a> {
     /// Metadata computed for each variable
     vars_metadata: Vec<(&'a Variable, ComputedVariableMetadata)>
 }
-
-
 
 #[derive(Debug)]
 struct ComputedVariableMetadata {
