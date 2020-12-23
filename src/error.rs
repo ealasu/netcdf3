@@ -1,5 +1,5 @@
 pub mod parse_header_error;
-use parse_header_error::ParseHeaderError;
+pub use parse_header_error::ParseHeaderError;
 
 use std::rc::Rc;
 use crate::{Dimension, DataType};
@@ -87,6 +87,22 @@ pub enum ReadError {
     ComputationNumberOfRecords,
     RecordIndexExceeded{index: usize, num_records: usize},
     Unexpected,
+}
+
+impl ReadError {
+
+    pub fn header_is_incomplete(&self) -> bool
+    {
+        let header_is_incomlete: bool = match &self {
+            ReadError::ParseHeader(parse_header_err) => {
+                parse_header_err.header_is_incomplete()
+            },
+            _ => {
+                false
+            },
+        };
+        return header_is_incomlete;
+    }
 }
 
 impl std::fmt::Display for ReadError {

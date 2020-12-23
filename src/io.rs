@@ -2,7 +2,7 @@
 
 mod file_reader;
 mod file_writer;
-mod tests;
+mod tests_io;
 
 pub use file_reader::FileReader;
 pub use file_writer::FileWriter;

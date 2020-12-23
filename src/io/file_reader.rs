@@ -205,6 +205,7 @@ use crate::{
 /// // ...
 /// # tmp_dir.close();
 /// ```
+#[derive(Debug)]
 pub struct FileReader {
     data_set: DataSet,
     version: Version,
@@ -254,7 +255,6 @@ macro_rules! impl_read_typed_record {
 
 impl FileReader {
 
-
     /// Returns the data set managed by the reader.
     pub fn data_set(&self) -> &DataSet {
         return &self.data_set;
@@ -273,6 +273,7 @@ impl FileReader {
     /// Opens the file and parses the header of the NetCDF-3.
     pub fn open<P: AsRef<Path>>(input_file_path: P) -> Result<Self, ReadError>
     {
+        const BUFFER_SIZE: usize = 1024;
         // Open the file
         let input_file_path: PathBuf = {
             let mut path = PathBuf::new();
@@ -280,17 +281,48 @@ impl FileReader {
             path
         };
         let mut input_file = std::fs::File::open(input_file_path.clone())?;
-
-        // Load bytes
-        let input: Vec<u8> = {
-            let mut input: Vec<u8> = vec![];
-            input_file.read_to_end(&mut input)?;
-            input
-        };
-
+        let file_size: usize = std::fs::metadata(&input_file_path)?.len() as usize; 
+        
         // Parse the header
-        let file_size: u64 = std::fs::metadata(&input_file_path)?.len();
-        let (data_set, version, vars_info): (DataSet, Version, Vec<VariableParsedMetadata>) = FileReader::parse_header(&input, file_size)?;
+        let (data_set, version, vars_info): (DataSet, Version, Vec<VariableParsedMetadata>) = {
+            let mut buffer: Vec<u8> = vec![];
+            let (data_set, version, vars_info): (DataSet, Version, Vec<VariableParsedMetadata>);
+            loop {
+                // Load bytes
+                let old_buf_start: usize = buffer.len();
+                let new_buf_size: usize = std::cmp::min(buffer.len() + BUFFER_SIZE, file_size);
+                let start: &usize = &old_buf_start;
+                let end: &usize = &new_buf_size;
+                buffer.resize(new_buf_size, 0_u8);
+                let _num_of_bytes = input_file.read(&mut buffer[*start..*end])?;
+
+                let parsing_result: Result<(DataSet, Version, Vec<VariableParsedMetadata>), ReadError>;
+                parsing_result = FileReader::parse_header(&buffer, file_size);
+                match parsing_result {
+                    Ok((data_set_2, version_2, vars_info_2)) => {
+                        data_set = data_set_2;
+                        version = version_2;
+                        vars_info = vars_info_2;
+                        break;
+                    },
+                    Err(read_err) => {
+                        if read_err.header_is_incomplete() {
+                            let buf_size: usize = buffer.len();
+                            if buf_size < file_size {
+                                // nothing to do
+                            }
+                            else {
+                                return Err(read_err);
+                            }
+                        }
+                        else {
+                            return Err(read_err);
+                        }
+                    },
+                }
+            }
+            (data_set, version, vars_info)
+        };
 
         // Return the result
         return Ok(FileReader{
@@ -470,17 +502,17 @@ impl FileReader {
     impl_read_typed_record!(read_record_f64, f64, DataType::F64, DataVector::F64);
 
     /// Parses the NetCDF-3 header
-    fn parse_header(input: &[u8], total_file_size: u64) -> Result<(DataSet, Version, Vec<VariableParsedMetadata>), ReadError> {
+    fn parse_header(input: &[u8], total_file_size: usize) -> Result<(DataSet, Version, Vec<VariableParsedMetadata>), ReadError> {
         // the magic word
-        let (input, _): (&[u8], &[u8]) = FileReader::parse_magic_word(input).unwrap();
+        let (input, _): (&[u8], &[u8]) = FileReader::parse_magic_word(input)?;
         // the version number
-        let (input, version) : (&[u8], Version) = FileReader::parse_version(input).unwrap();
+        let (input, version) : (&[u8], Version) = FileReader::parse_version(input)?;
 
         // the number of records
-        let (input, num_records): (&[u8], Option<usize>) = FileReader::parse_as_usize_optional(input).unwrap();
-        let (input, dims_list): (&[u8], Vec<(String, usize)>) = FileReader::parse_dims_list(input).unwrap();
-        let (input, global_attrs_list): (&[u8], Vec<_>) = FileReader::parse_attrs_list(input).unwrap();
-        let (_input, var_info_list): (&[u8], Vec<VariableParsedMetadata>) = FileReader::parse_vars_list(input, version.clone()).unwrap();
+        let (input, num_records): (&[u8], Option<usize>) = FileReader::parse_as_usize_optional(input)?;
+        let (input, dims_list): (&[u8], Vec<(String, usize)>) = FileReader::parse_dims_list(input)?;
+        let (input, global_attrs_list): (&[u8], Vec<_>) = FileReader::parse_attrs_list(input)?;
+        let (_input, var_info_list): (&[u8], Vec<VariableParsedMetadata>) = FileReader::parse_vars_list(input, version.clone())?;
 
         // Create a new dataset
         let mut data_set = DataSet::new();
@@ -560,7 +592,6 @@ impl FileReader {
             }
         }
 
-        // I
         if !num_records_is_determinated {
             // Case an *unlimited-size* dim s defined
             if let Some(dim) = data_set.get_unlimited_dim() {
@@ -571,14 +602,14 @@ impl FileReader {
                 }
                 else {
                     // Computation of the number of records
-                    let first_begin_offset: u64 = record_var_begin_offsets.into_iter().map(|begin_offset: Offset| i64::from(begin_offset) as u64).min().unwrap();
-                    let all_records_size: u64 = total_file_size  - first_begin_offset; // the size allocated for all record data
-                    let record_size: u64 = data_set.record_size().unwrap() as u64;  // cannot be zero
-                    if record_size == 0 {
+                    let first_begin_offset: usize = record_var_begin_offsets.into_iter().map(|begin_offset: Offset| i64::from(begin_offset) as usize).min().unwrap();
+                    let all_records_size: usize = total_file_size - first_begin_offset; // the size allocated for all record data
+                    let record_size: usize = data_set.record_size().ok_or(ReadError::Unexpected)?;
+                    if record_size == 0 {  // cannot be zero
                         return Err(ReadError::Unexpected);
                     }
-                    num_records = all_records_size.checked_div_euclid(record_size).ok_or(ReadError::Unexpected)? as usize;
-                    let num_rem_bytes: u64 = all_records_size.rem_euclid(record_size);  // the number of remaining bytes
+                    num_records = all_records_size.checked_div_euclid(record_size).ok_or(ReadError::Unexpected)?;
+                    let num_rem_bytes: usize = all_records_size.checked_rem_euclid(record_size).ok_or(ReadError::Unexpected)?;  // the number of remaining bytes
                     if num_rem_bytes != 0 {
                         return Err(ReadError::ComputationNumberOfRecords);
                     }
@@ -679,12 +710,12 @@ impl FileReader {
     {
         // Parsed the useful data
         let (input, data_vector): (&[u8], DataVector) = match data_type {
-            DataType::I8 => many_m_n(num_of_elements, num_of_elements, be_i8)(&input).map(|(input, data): (&[u8], Vec<i8>)| (input, DataVector::I8(data))),
-            DataType::U8 => many_m_n(num_of_elements, num_of_elements, be_u8)(&input).map(|(input, data): (&[u8], Vec<u8>)| (input, DataVector::U8(data))),
-            DataType::I16 => many_m_n(num_of_elements, num_of_elements, be_i16)(&input).map(|(input, data): (&[u8], Vec<i16>)| (input, DataVector::I16(data))),
-            DataType::I32 => many_m_n(num_of_elements, num_of_elements, be_i32)(&input).map(|(input, data): (&[u8], Vec<i32>)| (input, DataVector::I32(data))),
-            DataType::F32 => many_m_n(num_of_elements, num_of_elements, be_f32)(&input).map(|(input, data): (&[u8], Vec<f32>)| (input, DataVector::F32(data))),
-            DataType::F64 => many_m_n(num_of_elements, num_of_elements, be_f64)(&input).map(|(input, data): (&[u8], Vec<f64>)| (input, DataVector::F64(data))),
+            DataType::I8 => many_m_n(num_of_elements, num_of_elements, be_i8)(input).map(|(input, data): (&[u8], Vec<i8>)| (input, DataVector::I8(data))),
+            DataType::U8 => many_m_n(num_of_elements, num_of_elements, be_u8)(input).map(|(input, data): (&[u8], Vec<u8>)| (input, DataVector::U8(data))),
+            DataType::I16 => many_m_n(num_of_elements, num_of_elements, be_i16)(input).map(|(input, data): (&[u8], Vec<i16>)| (input, DataVector::I16(data))),
+            DataType::I32 => many_m_n(num_of_elements, num_of_elements, be_i32)(input).map(|(input, data): (&[u8], Vec<i32>)| (input, DataVector::I32(data))),
+            DataType::F32 => many_m_n(num_of_elements, num_of_elements, be_f32)(input).map(|(input, data): (&[u8], Vec<f32>)| (input, DataVector::F32(data))),
+            DataType::F64 => many_m_n(num_of_elements, num_of_elements, be_f64)(input).map(|(input, data): (&[u8], Vec<f64>)| (input, DataVector::F64(data))),
         }.map_err(|err: NomError|{
             ParseHeaderError::new(err, ParseHeaderErrorKind::DataElements)
         })?;

@@ -1,4 +1,5 @@
 mod tests_file_writer;
+mod tests_computed_data_set_metadata;
 
 use std::io::{Write, Seek, SeekFrom};
 use std::rc::Rc;
@@ -789,7 +790,8 @@ impl<'a> ComputedDataSetMetadata<'a> {
     }
 
     /// Computes and returns the size (number of bytes) needed to write the file header.
-    fn compute_header_required_size(data_set: &'a DataSet, version: Version) -> usize{
+    fn compute_header_required_size(data_set: &'a DataSet, version: Version) -> usize
+    {
         fn compute_name_string_size(name: &str) -> usize {
             let mut num_bytes: usize = 0;
             // the number bytes for the name
