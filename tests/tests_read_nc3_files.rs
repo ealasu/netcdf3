@@ -15,6 +15,7 @@ use netcdf3::{
     FileReader,
     DataSet, Variable, DataType, Version,
     Dimension, DimensionType,
+    error::ReadError,
 };
 use netcdf3::NC_FILL_I8;
 use netcdf3::NC_FILL_U8;
@@ -90,6 +91,61 @@ fn test_read_file_nc3_classic() {
     check_temperatures_data(&mut file_reader);
 
     tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_read_file_nc3_classic_open_with_truncated_file() {
+    const HEADER_NUM_OF_BYTES: usize = 1_684;
+
+    {
+        // Copy truncated bytes to a temporary file
+        let truncated_file_bytes: &[u8] = &b""[..];
+        let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(truncated_file_bytes, NC3_CLASSIC_FILE_NAME);
+        // Open the NetCDF-3 file
+        let reading_res: Result<FileReader, ReadError> = FileReader::open(input_data_file_path);
+        assert_eq!(true,            reading_res.is_err());
+        let reading_err: ReadError = reading_res.unwrap_err();
+        assert_eq!(true,            reading_err.header_is_incomplete());
+        // Check the parsing result
+        tmp_dir.close().unwrap();
+    }
+
+    {
+        // Copy truncated bytes to a temporary file
+        let truncated_file_bytes: &[u8] = &NC3_CLASSIC_FILE_BYTES[..1];
+        let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(truncated_file_bytes, NC3_CLASSIC_FILE_NAME);
+        // Open the NetCDF-3 file
+        let reading_res: Result<FileReader, ReadError> = FileReader::open(input_data_file_path);
+        // Check the parsing result
+        assert_eq!(true,            reading_res.is_err());
+        let reading_err: ReadError = reading_res.unwrap_err();
+        assert_eq!(true,            reading_err.header_is_incomplete());
+        tmp_dir.close().unwrap();
+    }
+
+    {
+        // Copy truncated bytes to a temporary file
+        let truncated_file_bytes: &[u8] = &NC3_CLASSIC_FILE_BYTES[..(HEADER_NUM_OF_BYTES - 1)];
+        let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(truncated_file_bytes, NC3_CLASSIC_FILE_NAME);
+        // Open the NetCDF-3 file
+        let reading_res: Result<FileReader, ReadError> = FileReader::open(input_data_file_path);
+        // Check the parsing result
+        assert_eq!(true,            reading_res.is_err());
+        let reading_err: ReadError = reading_res.unwrap_err();
+        assert_eq!(true,            reading_err.header_is_incomplete());
+        tmp_dir.close().unwrap();
+    }
+
+    {
+        // Copy truncated bytes to a temporary file
+        let truncated_file_bytes: &[u8] = &NC3_CLASSIC_FILE_BYTES[..(HEADER_NUM_OF_BYTES)];
+        let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(truncated_file_bytes, NC3_CLASSIC_FILE_NAME);
+        // Open the NetCDF-3 file
+        let reading_res: Result<FileReader, ReadError> = FileReader::open(input_data_file_path);
+        // Check the parsing result
+        assert_eq!(true,            reading_res.is_ok());
+        tmp_dir.close().unwrap();
+    }
 }
 
 #[test]

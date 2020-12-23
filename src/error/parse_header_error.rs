@@ -19,7 +19,7 @@ impl ParseHeaderError {
         }
     }
 
-    pub fn is_incomplete(&self) -> bool {
+    pub fn header_is_incomplete(&self) -> bool {
         match self.invalid_bytes {
             InvalidBytes::Incomplete(_) => true,
             _ => false,

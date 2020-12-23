@@ -1,16 +1,45 @@
 # Changelog
 
-## [Unreleased] - [unreleased]
-
-### Changed
-
-- Rename methods `FileReader::read_var_to_XX` to `FileReader::read_var_XX`, namely : `read_var_i8`, `read_var_u8`, `read_var_i16`, `read_var_i32`, `read_var_f32`, `read_var_f64`.
+## 0.5.1 - 2020-12-22
 
 ### Added
 
-- Add methods `FileReader::read_record_XX` , namely : `read_record`, `read_record_i8`, `read_record_u8`, `read_record_i16`, `read_record_i32`, `read_record_f32`, `read_record_f64`.
-- Add methods `FileWriter::write_record_XX` , namely: `write_record_i8`, `write_record_u8`, `write_record_i16`, `write_record_i32`, `write_record_f32`, `write_record_f64`.
+- Add the `struct error::ParseHeaderError` to the public API.
 
+### Changed
+
+- Improve and debug the method `FileReader::parse_header`, can parse truncated NetCDF-3 headers without panics.
+
+## 0.5.0 - 2020-12-13
+
+### Changed
+
+- Rename methods `FileReader::read_var_to_XX` to `FileReader::read_var_XX`, namely :
+    - `read_var_i8`
+    - `read_var_u8`
+    - `read_var_i16`
+    - `read_var_i32`
+    - `read_var_f32`
+    - `read_var_f64`
+
+### Added
+
+- Add methods `FileReader::read_record_XX` , namely :
+    - `read_record`
+    - `read_record_i8`
+    - `read_record_u8`
+    - `read_record_i16`
+    - `read_record_i32`
+    - `read_record_f32`
+    - `read_record_f64`
+
+- Add methods `FileWriter::write_record_XX` , namely:
+    - `write_record_i8`
+    - `write_record_u8`
+    - `write_record_i16`
+    - `write_record_i32`
+    - `write_record_f32`
+    - `write_record_f64`
 
 ## 0.4.0 - 2020-05-27
 
