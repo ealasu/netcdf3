@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased] - [unreleased]
+
+### Changed
+
+- Move all unit tests into `tests.rs` files to not reduce the code coverage involuntarily.
+
 ## 0.5.1 - 2020-12-22
 
 ### Added
