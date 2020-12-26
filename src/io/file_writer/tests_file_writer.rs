@@ -27,8 +27,8 @@ use super::{
 const TMP_DIR_PREFIX: &str = "netcdf3_tests_";
 
 #[test]
-fn test_file_writer_open() {
-    const TEST_FILE_NAME: &str = "test_file_writer_open.nc";
+fn test_open() {
+    const TEST_FILE_NAME: &str = "test_open.nc";
     const GLOBAL_ATTR_NAME_1: &str = "comment_1";
     const GLOBAL_ATTR_NAME_2: &str = "comment_2";
 
@@ -64,8 +64,8 @@ fn test_file_writer_open() {
 }
 
 #[test]
-fn test_file_writer_create_new() {
-    const TEST_FILE_NAME: &str = "test_file_writer_create_new.nc";
+fn test_create_new() {
+    const TEST_FILE_NAME: &str = "test_create_new.nc";
     const GLOBAL_ATTR_NAME: &str = "comment_1";
 
     let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
@@ -98,8 +98,8 @@ fn test_file_writer_create_new() {
 }
 
 #[test]
-fn test_file_writer_fill_missing_data_at_closing() {
-    const TEST_FILE_NAME: &str = "test_file_writer_fill_missing_data_at_closing.nc";
+fn test_fill_missing_data_at_closing() {
+    const TEST_FILE_NAME: &str = "test_fill_missing_data_at_closing.nc";
 
     const VAR_I8_NAME: &str = "var_i8";
     const VAR_U8_NAME: &str = "var_u8";
@@ -157,8 +157,8 @@ fn test_file_writer_fill_missing_data_at_closing() {
 }
 
 #[test]
-fn test_file_writer_write_record_i8() {
-    const TEST_FILE_NAME: &str = "test_file_writer_write_record_i8.nc";
+fn test_write_record_i8() {
+    const TEST_FILE_NAME: &str = "test_write_record_i8.nc";
 
     const VAR_I8_NAME: &str = "var_i8";
     const RECORD_1_I8_DATA: [i8; FIXED_DIM_SIZE] = [1, 2, 3, 4];
@@ -222,8 +222,8 @@ fn test_file_writer_write_record_i8() {
 }
 
 #[test]
-fn test_file_writer_write_record_i8_errors() {
-    const TEST_FILE_NAME: &str = "test_file_writer_write_record_i8_errors.nc";
+fn test_write_record_i8_errors() {
+    const TEST_FILE_NAME: &str = "test_write_record_i8_errors.nc";
     const VAR_I8_NAME: &str = "var_i8";
 
     const UNLIM_DIM_NAME: &str = "unlimited_dim";
@@ -322,8 +322,8 @@ fn test_file_writer_write_record_i8_errors() {
 }
 
 #[test]
-fn test_file_writer_write_record_u8() {
-    const TEST_FILE_NAME: &str = "test_file_writer_write_record_u8.nc";
+fn test_write_record_u8() {
+    const TEST_FILE_NAME: &str = "test_write_record_u8.nc";
 
     const VAR_U8_NAME: &str = "var_u8";
     const RECORD_1_U8_DATA: [u8; FIXED_DIM_SIZE] = [1, 2, 3, 4];
@@ -388,8 +388,8 @@ fn test_file_writer_write_record_u8() {
 }
 
 #[test]
-fn test_file_writer_write_record_u8_errors() {
-    const TEST_FILE_NAME: &str = "test_file_writer_write_record_u8_errors.nc";
+fn test_write_record_u8_errors() {
+    const TEST_FILE_NAME: &str = "test_write_record_u8_errors.nc";
     const VAR_U8_NAME: &str = "var_u8";
 
 
@@ -489,8 +489,8 @@ fn test_file_writer_write_record_u8_errors() {
 }
 
 #[test]
-fn test_file_writer_write_record_i16() {
-    const TEST_FILE_NAME: &str = "test_file_writer_write_record_i16.nc";
+fn test_write_record_i16() {
+    const TEST_FILE_NAME: &str = "test_write_record_i16.nc";
 
     const VAR_I16_NAME: &str = "var_i16";
     const RECORD_1_I16_DATA: [i16; FIXED_DIM_SIZE] = [1, 2, 3, 4];
@@ -555,8 +555,8 @@ fn test_file_writer_write_record_i16() {
 }
 
 #[test]
-fn test_file_writer_write_record_i16_errors() {
-    const TEST_FILE_NAME: &str = "test_file_writer_write_record_i16_errors.nc";
+fn test_write_record_i16_errors() {
+    const TEST_FILE_NAME: &str = "test_write_record_i16_errors.nc";
     const VAR_I16_NAME: &str = "var_i16";
 
     const UNLIM_DIM_NAME: &str = "unlimited_dim";
@@ -655,8 +655,8 @@ fn test_file_writer_write_record_i16_errors() {
 }
 
 #[test]
-fn test_file_writer_write_record_i32() {
-    const TEST_FILE_NAME: &str = "test_file_writer_write_record_i32.nc";
+fn test_write_record_i32() {
+    const TEST_FILE_NAME: &str = "test_write_record_i32.nc";
 
     const VAR_I32_NAME: &str = "var_i32";
     const RECORD_1_I32_DATA: [i32; FIXED_DIM_SIZE] = [1, 2, 3, 4];
@@ -721,8 +721,8 @@ fn test_file_writer_write_record_i32() {
 }
 
 #[test]
-fn test_file_writer_write_record_i32_errors() {
-    const TEST_FILE_NAME: &str = "test_file_writer_write_record_i32_errors.nc";
+fn test_write_record_i32_errors() {
+    const TEST_FILE_NAME: &str = "test_write_record_i32_errors.nc";
     const VAR_I32_NAME: &str = "var_i32";
 
     const UNLIM_DIM_NAME: &str = "unlimited_dim";
@@ -821,8 +821,8 @@ fn test_file_writer_write_record_i32_errors() {
 }
 
 #[test]
-fn test_file_writer_write_record_f32() {
-    const TEST_FILE_NAME: &str = "test_file_writer_write_record_f32.nc";
+fn test_write_record_f32() {
+    const TEST_FILE_NAME: &str = "test_write_record_f32.nc";
 
     const VAR_F32_NAME: &str = "var_f32";
     const RECORD_1_F32_DATA: [f32; FIXED_DIM_SIZE] = [1.0, 2.0, 3.0, 4.0];
@@ -886,8 +886,8 @@ fn test_file_writer_write_record_f32() {
 }
 
 #[test]
-fn test_file_writer_write_record_f32_errors() {
-    const TEST_FILE_NAME: &str = "test_file_writer_write_record_f32_errors.nc";
+fn test_write_record_f32_errors() {
+    const TEST_FILE_NAME: &str = "test_write_record_f32_errors.nc";
     const VAR_F32_NAME: &str = "var_f32";
 
     const UNLIM_DIM_NAME: &str = "unlimited_dim";
@@ -988,8 +988,8 @@ fn test_file_writer_write_record_f32_errors() {
 
 
 #[test]
-fn test_file_writer_write_record_f64() {
-    const TEST_FILE_NAME: &str = "test_file_writer_write_record_f64.nc";
+fn test_write_record_f64() {
+    const TEST_FILE_NAME: &str = "test_write_record_f64.nc";
 
     const VAR_F64_NAME: &str = "var_f64";
     const RECORD_1_F64_DATA: [f64; FIXED_DIM_SIZE] = [1.0, 2.0, 3.0, 4.0];
@@ -1053,8 +1053,8 @@ fn test_file_writer_write_record_f64() {
 }
 
 #[test]
-fn test_file_writer_write_record_f64_errors() {
-    const TEST_FILE_NAME: &str = "test_file_writer_write_record_f64_errors.nc";
+fn test_write_record_f64_errors() {
+    const TEST_FILE_NAME: &str = "test_write_record_f64_errors.nc";
     const VAR_F64_NAME: &str = "var_f64";
 
     const UNLIM_DIM_NAME: &str = "unlimited_dim";
@@ -1313,4 +1313,772 @@ fn test_write_name_string() {
         assert_eq!(0,           cursor.read_u8().unwrap());
         assert_eq!(0,           cursor.read_u8().unwrap());
     }
+}
+
+#[test]
+fn test_write_var_i8() {
+    const TEST_FILE_NAME: &str = "test_write_var_i8.nc";
+
+    const UNLIM_DIM_NAME: &str = "unlimited_dim";
+    const UNLIM_DIM_SIZE: usize = 5;
+    const FIXED_DIM_NAME: &str = "fixed_dim";
+    const FIXED_DIM_SIZE: usize = 4;
+
+    const VAR_I8_NAME: &str = "var_i8";
+    const VAR_I8_SIZE: usize = UNLIM_DIM_SIZE * FIXED_DIM_SIZE;
+    const VAR_I8_DATA: [i8; VAR_I8_SIZE] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+
+    let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
+    let test_file_path: PathBuf = tmp_dir.path().join(TEST_FILE_NAME);
+    assert_eq!(false,               test_file_path.exists());
+
+    // First create and write a new NetCDF-3 file
+    {
+        let mut file_writer: FileWriter = FileWriter::create_new(&test_file_path).unwrap();
+        let mut data_set = DataSet::new();
+        data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+        data_set.add_fixed_dim(FIXED_DIM_NAME, FIXED_DIM_SIZE).unwrap();
+        data_set.add_var_i8(VAR_I8_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+
+        file_writer.set_def(&data_set, Version::Classic, 0).unwrap();
+        file_writer.write_var_i8(VAR_I8_NAME, &VAR_I8_DATA).unwrap();
+        file_writer.close().unwrap();
+    }
+    assert_eq!(true,                        test_file_path.exists());
+
+    // Then read the outlet file
+    {
+        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        assert_eq!(true,                    file_reader.data_set().has_var(VAR_I8_NAME));
+        let var: &Variable = file_reader.data_set().get_var(VAR_I8_NAME).unwrap();
+        assert_eq!(DataType::I8,        var.data_type());
+
+        let var_data: Vec<i8> = file_reader.read_var_i8(VAR_I8_NAME).unwrap();
+        file_reader.close();
+        assert_eq!(&VAR_I8_DATA[..], &var_data[..]);
+    }
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_write_var_i8_errors() {
+    const TEST_FILE_NAME: &str = "test_write_record_i8_errors.nc";
+
+    const UNLIM_DIM_NAME: &str = "unlimited_dim";
+    const UNLIM_DIM_SIZE: usize = 5;
+    const FIXED_DIM_NAME: &str = "fixed_dim";
+    const FIXED_DIM_SIZE: usize = 4;
+
+    const VAR_I8_NAME: &str = "var_i8";
+    const VAR_I8_SIZE: usize = UNLIM_DIM_SIZE * FIXED_DIM_SIZE;
+    const VAR_I8_DATA: [i8; VAR_I8_SIZE] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+    let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
+    let test_file_path: PathBuf = tmp_dir.path().join(TEST_FILE_NAME);
+    assert_eq!(false,               test_file_path.exists());
+
+    // First create a new NetCDF-3 file and try to write wrong invalid records
+    {
+        const VAR_U8_NAME: &str = "var_u8";
+        const VAR_I16_NAME: &str = "var_i16";
+        const VAR_I32_NAME: &str = "var_i32";
+        const VAR_F32_NAME: &str = "var_f32";
+        const VAR_F64_NAME: &str = "var_f64";
+        const UNDEF_VAR_NAME:& str = "undef_var";
+
+        let mut file_writer: FileWriter = FileWriter::create_new(&test_file_path).unwrap();
+        let mut data_set = DataSet::new();
+        data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+        data_set.add_fixed_dim(FIXED_DIM_NAME, FIXED_DIM_SIZE).unwrap();
+        data_set.add_var_i8(VAR_I8_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_u8(VAR_U8_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_i16(VAR_I16_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_i32(VAR_I32_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_f32(VAR_F32_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_f64(VAR_F64_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        file_writer.set_def(&data_set, Version::Classic, 0).unwrap();  // set an empty data set
+
+        assert_eq!(
+            WriteError::VariableNotDefined(UNDEF_VAR_NAME.to_string()),
+            file_writer.write_var_i8(UNDEF_VAR_NAME, &VAR_I8_DATA).unwrap_err()
+        );
+
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_U8_NAME.to_string(), req: DataType::U8, get: DataType::I8},
+            file_writer.write_var_i8(VAR_U8_NAME, &VAR_I8_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I16_NAME.to_string(), req: DataType::I16, get: DataType::I8},
+            file_writer.write_var_i8(VAR_I16_NAME, &VAR_I8_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I32_NAME.to_string(), req: DataType::I32, get: DataType::I8},
+            file_writer.write_var_i8(VAR_I32_NAME, &VAR_I8_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_F32_NAME.to_string(), req: DataType::F32, get: DataType::I8},
+            file_writer.write_var_i8(VAR_F32_NAME, &VAR_I8_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_F64_NAME.to_string(), req: DataType::F64, get: DataType::I8},
+            file_writer.write_var_i8(VAR_F64_NAME, &VAR_I8_DATA).unwrap_err()
+        );
+        file_writer.close().unwrap();
+    }
+    assert_eq!(true,                        test_file_path.exists());
+
+    // Then read the outlet variable
+    {
+        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        assert_eq!(true,                    file_reader.data_set().has_var(VAR_I8_NAME));
+        {
+            let var: &Variable = file_reader.data_set().get_var(VAR_I8_NAME).unwrap();
+            assert_eq!(DataType::I8,        var.data_type());
+        }
+
+        let var_data: Vec<i8> = file_reader.read_var_i8(VAR_I8_NAME).unwrap();
+        file_reader.close();
+        assert_eq!(vec![NC_FILL_I8; VAR_I8_SIZE],    var_data);
+    }
+
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_write_var_u8() {
+    const TEST_FILE_NAME: &str = "test_write_var_u8.nc";
+
+    const UNLIM_DIM_NAME: &str = "unlimited_dim";
+    const UNLIM_DIM_SIZE: usize = 5;
+    const FIXED_DIM_NAME: &str = "fixed_dim";
+    const FIXED_DIM_SIZE: usize = 4;
+
+    const VAR_U8_NAME: &str = "var_u8";
+    const VAR_U8_SIZE: usize = UNLIM_DIM_SIZE * FIXED_DIM_SIZE;
+    const VAR_U8_DATA: [u8; VAR_U8_SIZE] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+
+    let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
+    let test_file_path: PathBuf = tmp_dir.path().join(TEST_FILE_NAME);
+    assert_eq!(false,               test_file_path.exists());
+
+    // First create and write a new NetCDF-3 file
+    {
+        let mut file_writer: FileWriter = FileWriter::create_new(&test_file_path).unwrap();
+        let mut data_set = DataSet::new();
+        data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+        data_set.add_fixed_dim(FIXED_DIM_NAME, FIXED_DIM_SIZE).unwrap();
+        data_set.add_var_u8(VAR_U8_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+
+        file_writer.set_def(&data_set, Version::Classic, 0).unwrap();
+        file_writer.write_var_u8(VAR_U8_NAME, &VAR_U8_DATA).unwrap();
+        file_writer.close().unwrap();
+    }
+    assert_eq!(true,                        test_file_path.exists());
+
+    // Then read the outlet file
+    {
+        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        assert_eq!(true,                    file_reader.data_set().has_var(VAR_U8_NAME));
+        let var: &Variable = file_reader.data_set().get_var(VAR_U8_NAME).unwrap();
+        assert_eq!(DataType::U8,        var.data_type());
+
+        let var_data: Vec<u8> = file_reader.read_var_u8(VAR_U8_NAME).unwrap();
+        file_reader.close();
+        assert_eq!(&VAR_U8_DATA[..], &var_data[..]);
+    }
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_write_var_u8_errors() {
+    const TEST_FILE_NAME: &str = "test_write_record_u8_errors.nc";
+
+    const UNLIM_DIM_NAME: &str = "unlimited_dim";
+    const UNLIM_DIM_SIZE: usize = 5;
+    const FIXED_DIM_NAME: &str = "fixed_dim";
+    const FIXED_DIM_SIZE: usize = 4;
+
+    const VAR_U8_NAME: &str = "var_u8";
+    const VAR_U8_SIZE: usize = UNLIM_DIM_SIZE * FIXED_DIM_SIZE;
+    const VAR_U8_DATA: [u8; VAR_U8_SIZE] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+    let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
+    let test_file_path: PathBuf = tmp_dir.path().join(TEST_FILE_NAME);
+    assert_eq!(false,               test_file_path.exists());
+
+    // First create a new NetCDF-3 file and try to write wrong invalid records
+    {
+        const VAR_I8_NAME: &str = "var_i8";
+        const VAR_I16_NAME: &str = "var_i16";
+        const VAR_I32_NAME: &str = "var_i32";
+        const VAR_F32_NAME: &str = "var_f32";
+        const VAR_F64_NAME: &str = "var_f64";
+        const UNDEF_VAR_NAME:& str = "undef_var";
+
+        let mut file_writer: FileWriter = FileWriter::create_new(&test_file_path).unwrap();
+        let mut data_set = DataSet::new();
+        data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+        data_set.add_fixed_dim(FIXED_DIM_NAME, FIXED_DIM_SIZE).unwrap();
+        data_set.add_var_i8(VAR_I8_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_u8(VAR_U8_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_i16(VAR_I16_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_i32(VAR_I32_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_f32(VAR_F32_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_f64(VAR_F64_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        file_writer.set_def(&data_set, Version::Classic, 0).unwrap();  // set an empty data set
+
+        assert_eq!(
+            WriteError::VariableNotDefined(UNDEF_VAR_NAME.to_string()),
+            file_writer.write_var_u8(UNDEF_VAR_NAME, &VAR_U8_DATA).unwrap_err()
+        );
+
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I8_NAME.to_string(), req: DataType::I8, get: DataType::U8},
+            file_writer.write_var_u8(VAR_I8_NAME, &VAR_U8_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I16_NAME.to_string(), req: DataType::I16, get: DataType::U8},
+            file_writer.write_var_u8(VAR_I16_NAME, &VAR_U8_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I32_NAME.to_string(), req: DataType::I32, get: DataType::U8},
+            file_writer.write_var_u8(VAR_I32_NAME, &VAR_U8_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_F32_NAME.to_string(), req: DataType::F32, get: DataType::U8},
+            file_writer.write_var_u8(VAR_F32_NAME, &VAR_U8_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_F64_NAME.to_string(), req: DataType::F64, get: DataType::U8},
+            file_writer.write_var_u8(VAR_F64_NAME, &VAR_U8_DATA).unwrap_err()
+        );
+        file_writer.close().unwrap();
+    }
+    assert_eq!(true,                        test_file_path.exists());
+
+    // Then read the outlet variable
+    {
+        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        assert_eq!(true,                    file_reader.data_set().has_var(VAR_U8_NAME));
+        {
+            let var: &Variable = file_reader.data_set().get_var(VAR_U8_NAME).unwrap();
+            assert_eq!(DataType::U8,        var.data_type());
+        }
+
+        let var_data: Vec<u8> = file_reader.read_var_u8(VAR_U8_NAME).unwrap();
+        file_reader.close();
+        assert_eq!(vec![NC_FILL_U8; VAR_U8_SIZE],    var_data);
+    }
+
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_write_var_i16() {
+    const TEST_FILE_NAME: &str = "test_write_var_i16.nc";
+
+    const UNLIM_DIM_NAME: &str = "unlimited_dim";
+    const UNLIM_DIM_SIZE: usize = 5;
+    const FIXED_DIM_NAME: &str = "fixed_dim";
+    const FIXED_DIM_SIZE: usize = 4;
+
+    const VAR_I16_NAME: &str = "var_i16";
+    const VAR_I16_SIZE: usize = UNLIM_DIM_SIZE * FIXED_DIM_SIZE;
+    const VAR_I16_DATA: [i16; VAR_I16_SIZE] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+
+    let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
+    let test_file_path: PathBuf = tmp_dir.path().join(TEST_FILE_NAME);
+    assert_eq!(false,               test_file_path.exists());
+
+    // First create and write a new NetCDF-3 file
+    {
+        let mut file_writer: FileWriter = FileWriter::create_new(&test_file_path).unwrap();
+        let mut data_set = DataSet::new();
+        data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+        data_set.add_fixed_dim(FIXED_DIM_NAME, FIXED_DIM_SIZE).unwrap();
+        data_set.add_var_i16(VAR_I16_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+
+        file_writer.set_def(&data_set, Version::Classic, 0).unwrap();
+        file_writer.write_var_i16(VAR_I16_NAME, &VAR_I16_DATA).unwrap();
+        file_writer.close().unwrap();
+    }
+    assert_eq!(true,                        test_file_path.exists());
+
+    // Then read the outlet file
+    {
+        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        assert_eq!(true,                    file_reader.data_set().has_var(VAR_I16_NAME));
+        let var: &Variable = file_reader.data_set().get_var(VAR_I16_NAME).unwrap();
+        assert_eq!(DataType::I16,        var.data_type());
+
+        let var_data: Vec<i16> = file_reader.read_var_i16(VAR_I16_NAME).unwrap();
+        file_reader.close();
+        assert_eq!(&VAR_I16_DATA[..], &var_data[..]);
+    }
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_write_var_i16_errors() {
+    const TEST_FILE_NAME: &str = "test_write_record_i16_errors.nc";
+
+    const UNLIM_DIM_NAME: &str = "unlimited_dim";
+    const UNLIM_DIM_SIZE: usize = 5;
+    const FIXED_DIM_NAME: &str = "fixed_dim";
+    const FIXED_DIM_SIZE: usize = 4;
+
+    const VAR_I16_NAME: &str = "var_i16";
+    const VAR_I16_SIZE: usize = UNLIM_DIM_SIZE * FIXED_DIM_SIZE;
+    const VAR_I16_DATA: [i16; VAR_I16_SIZE] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+    let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
+    let test_file_path: PathBuf = tmp_dir.path().join(TEST_FILE_NAME);
+    assert_eq!(false,               test_file_path.exists());
+
+    // First create a new NetCDF-3 file and try to write wrong invalid records
+    {
+        const VAR_I8_NAME: &str = "var_i8";
+        const VAR_U8_NAME: &str = "var_u8";
+        const VAR_I32_NAME: &str = "var_i32";
+        const VAR_F32_NAME: &str = "var_f32";
+        const VAR_F64_NAME: &str = "var_f64";
+        const UNDEF_VAR_NAME:& str = "undef_var";
+
+        let mut file_writer: FileWriter = FileWriter::create_new(&test_file_path).unwrap();
+        let mut data_set = DataSet::new();
+        data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+        data_set.add_fixed_dim(FIXED_DIM_NAME, FIXED_DIM_SIZE).unwrap();
+        data_set.add_var_i8(VAR_I8_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_u8(VAR_U8_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_i16(VAR_I16_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_i32(VAR_I32_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_f32(VAR_F32_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_f64(VAR_F64_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        file_writer.set_def(&data_set, Version::Classic, 0).unwrap();  // set an empty data set
+
+        assert_eq!(
+            WriteError::VariableNotDefined(UNDEF_VAR_NAME.to_string()),
+            file_writer.write_var_i16(UNDEF_VAR_NAME, &VAR_I16_DATA).unwrap_err()
+        );
+
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I8_NAME.to_string(), req: DataType::I8, get: DataType::I16},
+            file_writer.write_var_i16(VAR_I8_NAME, &VAR_I16_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_U8_NAME.to_string(), req: DataType::U8, get: DataType::I16},
+            file_writer.write_var_i16(VAR_U8_NAME, &VAR_I16_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I32_NAME.to_string(), req: DataType::I32, get: DataType::I16},
+            file_writer.write_var_i16(VAR_I32_NAME, &VAR_I16_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_F32_NAME.to_string(), req: DataType::F32, get: DataType::I16},
+            file_writer.write_var_i16(VAR_F32_NAME, &VAR_I16_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_F64_NAME.to_string(), req: DataType::F64, get: DataType::I16},
+            file_writer.write_var_i16(VAR_F64_NAME, &VAR_I16_DATA).unwrap_err()
+        );
+        file_writer.close().unwrap();
+    }
+    assert_eq!(true,                        test_file_path.exists());
+
+    // Then read the outlet variable
+    {
+        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        assert_eq!(true,                    file_reader.data_set().has_var(VAR_I16_NAME));
+        {
+            let var: &Variable = file_reader.data_set().get_var(VAR_I16_NAME).unwrap();
+            assert_eq!(DataType::I16,        var.data_type());
+        }
+
+        let var_data: Vec<i16> = file_reader.read_var_i16(VAR_I16_NAME).unwrap();
+        file_reader.close();
+        assert_eq!(vec![NC_FILL_I16; VAR_I16_SIZE],    var_data);
+    }
+
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_write_var_i32() {
+    const TEST_FILE_NAME: &str = "test_write_var_i32.nc";
+
+    const UNLIM_DIM_NAME: &str = "unlimited_dim";
+    const UNLIM_DIM_SIZE: usize = 5;
+    const FIXED_DIM_NAME: &str = "fixed_dim";
+    const FIXED_DIM_SIZE: usize = 4;
+
+    const VAR_I32_NAME: &str = "var_i32";
+    const VAR_I32_SIZE: usize = UNLIM_DIM_SIZE * FIXED_DIM_SIZE;
+    const VAR_I32_DATA: [i32; VAR_I32_SIZE] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+
+    let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
+    let test_file_path: PathBuf = tmp_dir.path().join(TEST_FILE_NAME);
+    assert_eq!(false,               test_file_path.exists());
+
+    // First create and write a new NetCDF-3 file
+    {
+        let mut file_writer: FileWriter = FileWriter::create_new(&test_file_path).unwrap();
+        let mut data_set = DataSet::new();
+        data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+        data_set.add_fixed_dim(FIXED_DIM_NAME, FIXED_DIM_SIZE).unwrap();
+        data_set.add_var_i32(VAR_I32_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+
+        file_writer.set_def(&data_set, Version::Classic, 0).unwrap();
+        file_writer.write_var_i32(VAR_I32_NAME, &VAR_I32_DATA).unwrap();
+        file_writer.close().unwrap();
+    }
+    assert_eq!(true,                        test_file_path.exists());
+
+    // Then read the outlet file
+    {
+        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        assert_eq!(true,                    file_reader.data_set().has_var(VAR_I32_NAME));
+        let var: &Variable = file_reader.data_set().get_var(VAR_I32_NAME).unwrap();
+        assert_eq!(DataType::I32,        var.data_type());
+
+        let var_data: Vec<i32> = file_reader.read_var_i32(VAR_I32_NAME).unwrap();
+        file_reader.close();
+        assert_eq!(&VAR_I32_DATA[..], &var_data[..]);
+    }
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_write_var_i32_errors() {
+    const TEST_FILE_NAME: &str = "test_write_record_i32_errors.nc";
+
+    const UNLIM_DIM_NAME: &str = "unlimited_dim";
+    const UNLIM_DIM_SIZE: usize = 5;
+    const FIXED_DIM_NAME: &str = "fixed_dim";
+    const FIXED_DIM_SIZE: usize = 4;
+
+    const VAR_I32_NAME: &str = "var_i32";
+    const VAR_I32_SIZE: usize = UNLIM_DIM_SIZE * FIXED_DIM_SIZE;
+    const VAR_I32_DATA: [i32; VAR_I32_SIZE] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+    let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
+    let test_file_path: PathBuf = tmp_dir.path().join(TEST_FILE_NAME);
+    assert_eq!(false,               test_file_path.exists());
+
+    // First create a new NetCDF-3 file and try to write wrong invalid records
+    {
+        const VAR_I8_NAME: &str = "var_i8";
+        const VAR_U8_NAME: &str = "var_u8";
+        const VAR_I16_NAME: &str = "var_i16";
+        const VAR_F32_NAME: &str = "var_f32";
+        const VAR_F64_NAME: &str = "var_f64";
+        const UNDEF_VAR_NAME:& str = "undef_var";
+
+        let mut file_writer: FileWriter = FileWriter::create_new(&test_file_path).unwrap();
+        let mut data_set = DataSet::new();
+        data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+        data_set.add_fixed_dim(FIXED_DIM_NAME, FIXED_DIM_SIZE).unwrap();
+        data_set.add_var_i8(VAR_I8_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_u8(VAR_U8_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_i16(VAR_I16_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_i32(VAR_I32_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_f32(VAR_F32_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_f64(VAR_F64_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        file_writer.set_def(&data_set, Version::Classic, 0).unwrap();  // set an empty data set
+
+        assert_eq!(
+            WriteError::VariableNotDefined(UNDEF_VAR_NAME.to_string()),
+            file_writer.write_var_i32(UNDEF_VAR_NAME, &VAR_I32_DATA).unwrap_err()
+        );
+
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I8_NAME.to_string(), req: DataType::I8, get: DataType::I32},
+            file_writer.write_var_i32(VAR_I8_NAME, &VAR_I32_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_U8_NAME.to_string(), req: DataType::U8, get: DataType::I32},
+            file_writer.write_var_i32(VAR_U8_NAME, &VAR_I32_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I16_NAME.to_string(), req: DataType::I16, get: DataType::I32},
+            file_writer.write_var_i32(VAR_I16_NAME, &VAR_I32_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_F32_NAME.to_string(), req: DataType::F32, get: DataType::I32},
+            file_writer.write_var_i32(VAR_F32_NAME, &VAR_I32_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_F64_NAME.to_string(), req: DataType::F64, get: DataType::I32},
+            file_writer.write_var_i32(VAR_F64_NAME, &VAR_I32_DATA).unwrap_err()
+        );
+        file_writer.close().unwrap();
+    }
+    assert_eq!(true,                        test_file_path.exists());
+
+    // Then read the outlet variable
+    {
+        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        assert_eq!(true,                    file_reader.data_set().has_var(VAR_I32_NAME));
+        {
+            let var: &Variable = file_reader.data_set().get_var(VAR_I32_NAME).unwrap();
+            assert_eq!(DataType::I32,        var.data_type());
+        }
+
+        let var_data: Vec<i32> = file_reader.read_var_i32(VAR_I32_NAME).unwrap();
+        file_reader.close();
+        assert_eq!(vec![NC_FILL_I32; VAR_I32_SIZE],    var_data);
+    }
+
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_write_var_f32() {
+    const TEST_FILE_NAME: &str = "test_write_var_f32.nc";
+
+    const UNLIM_DIM_NAME: &str = "unlimited_dim";
+    const UNLIM_DIM_SIZE: usize = 5;
+    const FIXED_DIM_NAME: &str = "fixed_dim";
+    const FIXED_DIM_SIZE: usize = 4;
+
+    const VAR_F32_NAME: &str = "var_f32";
+    const VAR_F32_SIZE: usize = UNLIM_DIM_SIZE * FIXED_DIM_SIZE;
+    const VAR_F32_DATA: [f32; VAR_F32_SIZE] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0];
+
+    let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
+    let test_file_path: PathBuf = tmp_dir.path().join(TEST_FILE_NAME);
+    assert_eq!(false,               test_file_path.exists());
+
+    // First create and write a new NetCDF-3 file
+    {
+        let mut file_writer: FileWriter = FileWriter::create_new(&test_file_path).unwrap();
+        let mut data_set = DataSet::new();
+        data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+        data_set.add_fixed_dim(FIXED_DIM_NAME, FIXED_DIM_SIZE).unwrap();
+        data_set.add_var_f32(VAR_F32_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+
+        file_writer.set_def(&data_set, Version::Classic, 0).unwrap();
+        file_writer.write_var_f32(VAR_F32_NAME, &VAR_F32_DATA).unwrap();
+        file_writer.close().unwrap();
+    }
+    assert_eq!(true,                        test_file_path.exists());
+
+    // Then read the outlet file
+    {
+        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        assert_eq!(true,                    file_reader.data_set().has_var(VAR_F32_NAME));
+        let var: &Variable = file_reader.data_set().get_var(VAR_F32_NAME).unwrap();
+        assert_eq!(DataType::F32,        var.data_type());
+
+        let var_data: Vec<f32> = file_reader.read_var_f32(VAR_F32_NAME).unwrap();
+        file_reader.close();
+        assert_eq!(&VAR_F32_DATA[..], &var_data[..]);
+    }
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_write_var_f32_errors() {
+    const TEST_FILE_NAME: &str = "test_write_record_f32_errors.nc";
+
+    const UNLIM_DIM_NAME: &str = "unlimited_dim";
+    const UNLIM_DIM_SIZE: usize = 5;
+    const FIXED_DIM_NAME: &str = "fixed_dim";
+    const FIXED_DIM_SIZE: usize = 4;
+
+    const VAR_F32_NAME: &str = "var_f32";
+    const VAR_F32_SIZE: usize = UNLIM_DIM_SIZE * FIXED_DIM_SIZE;
+    const VAR_F32_DATA: [f32; VAR_F32_SIZE] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0];
+    let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
+    let test_file_path: PathBuf = tmp_dir.path().join(TEST_FILE_NAME);
+    assert_eq!(false,               test_file_path.exists());
+
+    // First create a new NetCDF-3 file and try to write wrong invalid records
+    {
+        const VAR_I8_NAME: &str = "var_i8";
+        const VAR_U8_NAME: &str = "var_u8";
+        const VAR_I16_NAME: &str = "var_i16";
+        const VAR_I32_NAME: &str = "var_i32";
+        const VAR_F64_NAME: &str = "var_f64";
+        const UNDEF_VAR_NAME:& str = "undef_var";
+
+        let mut file_writer: FileWriter = FileWriter::create_new(&test_file_path).unwrap();
+        let mut data_set = DataSet::new();
+        data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+        data_set.add_fixed_dim(FIXED_DIM_NAME, FIXED_DIM_SIZE).unwrap();
+        data_set.add_var_i8(VAR_I8_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_u8(VAR_U8_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_i16(VAR_I16_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_i32(VAR_I32_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_f32(VAR_F32_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_f64(VAR_F64_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        file_writer.set_def(&data_set, Version::Classic, 0).unwrap();  // set an empty data set
+
+        assert_eq!(
+            WriteError::VariableNotDefined(UNDEF_VAR_NAME.to_string()),
+            file_writer.write_var_f32(UNDEF_VAR_NAME, &VAR_F32_DATA).unwrap_err()
+        );
+
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I8_NAME.to_string(), req: DataType::I8, get: DataType::F32},
+            file_writer.write_var_f32(VAR_I8_NAME, &VAR_F32_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_U8_NAME.to_string(), req: DataType::U8, get: DataType::F32},
+            file_writer.write_var_f32(VAR_U8_NAME, &VAR_F32_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I16_NAME.to_string(), req: DataType::I16, get: DataType::F32},
+            file_writer.write_var_f32(VAR_I16_NAME, &VAR_F32_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I32_NAME.to_string(), req: DataType::I32, get: DataType::F32},
+            file_writer.write_var_f32(VAR_I32_NAME, &VAR_F32_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_F64_NAME.to_string(), req: DataType::F64, get: DataType::F32},
+            file_writer.write_var_f32(VAR_F64_NAME, &VAR_F32_DATA).unwrap_err()
+        );
+        file_writer.close().unwrap();
+    }
+    assert_eq!(true,                        test_file_path.exists());
+
+    // Then read the outlet variable
+    {
+        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        assert_eq!(true,                    file_reader.data_set().has_var(VAR_F32_NAME));
+        {
+            let var: &Variable = file_reader.data_set().get_var(VAR_F32_NAME).unwrap();
+            assert_eq!(DataType::F32,        var.data_type());
+        }
+
+        let var_data: Vec<f32> = file_reader.read_var_f32(VAR_F32_NAME).unwrap();
+        file_reader.close();
+        assert_eq!(vec![NC_FILL_F32; VAR_F32_SIZE],    var_data);
+    }
+
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_write_var_f64() {
+    const TEST_FILE_NAME: &str = "test_write_var_f64.nc";
+
+    const UNLIM_DIM_NAME: &str = "unlimited_dim";
+    const UNLIM_DIM_SIZE: usize = 5;
+    const FIXED_DIM_NAME: &str = "fixed_dim";
+    const FIXED_DIM_SIZE: usize = 4;
+
+    const VAR_F64_NAME: &str = "var_f64";
+    const VAR_F64_SIZE: usize = UNLIM_DIM_SIZE * FIXED_DIM_SIZE;
+    const VAR_F64_DATA: [f64; VAR_F64_SIZE] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0];
+
+    let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
+    let test_file_path: PathBuf = tmp_dir.path().join(TEST_FILE_NAME);
+    assert_eq!(false,               test_file_path.exists());
+
+    // First create and write a new NetCDF-3 file
+    {
+        let mut file_writer: FileWriter = FileWriter::create_new(&test_file_path).unwrap();
+        let mut data_set = DataSet::new();
+        data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+        data_set.add_fixed_dim(FIXED_DIM_NAME, FIXED_DIM_SIZE).unwrap();
+        data_set.add_var_f64(VAR_F64_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+
+        file_writer.set_def(&data_set, Version::Classic, 0).unwrap();
+        file_writer.write_var_f64(VAR_F64_NAME, &VAR_F64_DATA).unwrap();
+        file_writer.close().unwrap();
+    }
+    assert_eq!(true,                        test_file_path.exists());
+
+    // Then read the outlet file
+    {
+        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        assert_eq!(true,                    file_reader.data_set().has_var(VAR_F64_NAME));
+        let var: &Variable = file_reader.data_set().get_var(VAR_F64_NAME).unwrap();
+        assert_eq!(DataType::F64,        var.data_type());
+
+        let var_data: Vec<f64> = file_reader.read_var_f64(VAR_F64_NAME).unwrap();
+        file_reader.close();
+        assert_eq!(&VAR_F64_DATA[..], &var_data[..]);
+    }
+    tmp_dir.close().unwrap();
+}
+
+#[test]
+fn test_write_var_f64_errors() {
+    const TEST_FILE_NAME: &str = "test_write_record_f64_errors.nc";
+
+    const UNLIM_DIM_NAME: &str = "unlimited_dim";
+    const UNLIM_DIM_SIZE: usize = 5;
+    const FIXED_DIM_NAME: &str = "fixed_dim";
+    const FIXED_DIM_SIZE: usize = 4;
+
+    const VAR_F64_NAME: &str = "var_f64";
+    const VAR_F64_SIZE: usize = UNLIM_DIM_SIZE * FIXED_DIM_SIZE;
+    const VAR_F64_DATA: [f64; VAR_F64_SIZE] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0];
+    let tmp_dir: TempDir = TempDir::new(TMP_DIR_PREFIX).unwrap();
+    let test_file_path: PathBuf = tmp_dir.path().join(TEST_FILE_NAME);
+    assert_eq!(false,               test_file_path.exists());
+
+    // First create a new NetCDF-3 file and try to write wrong invalid records
+    {
+        const VAR_I8_NAME: &str = "var_i8";
+        const VAR_U8_NAME: &str = "var_u8";
+        const VAR_I16_NAME: &str = "var_i16";
+        const VAR_I32_NAME: &str = "var_i32";
+        const VAR_F32_NAME: &str = "var_f32";
+        const UNDEF_VAR_NAME:& str = "undef_var";
+
+        let mut file_writer: FileWriter = FileWriter::create_new(&test_file_path).unwrap();
+        let mut data_set = DataSet::new();
+        data_set.set_unlimited_dim(UNLIM_DIM_NAME, UNLIM_DIM_SIZE).unwrap();
+        data_set.add_fixed_dim(FIXED_DIM_NAME, FIXED_DIM_SIZE).unwrap();
+        data_set.add_var_i8(VAR_I8_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_u8(VAR_U8_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_i16(VAR_I16_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_i32(VAR_I32_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_f32(VAR_F32_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        data_set.add_var_f64(VAR_F64_NAME, &[UNLIM_DIM_NAME, FIXED_DIM_NAME]).unwrap();
+        file_writer.set_def(&data_set, Version::Classic, 0).unwrap();  // set an empty data set
+
+        assert_eq!(
+            WriteError::VariableNotDefined(UNDEF_VAR_NAME.to_string()),
+            file_writer.write_var_f64(UNDEF_VAR_NAME, &VAR_F64_DATA).unwrap_err()
+        );
+
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I8_NAME.to_string(), req: DataType::I8, get: DataType::F64},
+            file_writer.write_var_f64(VAR_I8_NAME, &VAR_F64_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_U8_NAME.to_string(), req: DataType::U8, get: DataType::F64},
+            file_writer.write_var_f64(VAR_U8_NAME, &VAR_F64_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I16_NAME.to_string(), req: DataType::I16, get: DataType::F64},
+            file_writer.write_var_f64(VAR_I16_NAME, &VAR_F64_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_I32_NAME.to_string(), req: DataType::I32, get: DataType::F64},
+            file_writer.write_var_f64(VAR_I32_NAME, &VAR_F64_DATA).unwrap_err()
+        );
+        assert_eq!(
+            WriteError::VariableMismatchDataType{var_name: VAR_F32_NAME.to_string(), req: DataType::F32, get: DataType::F64},
+            file_writer.write_var_f64(VAR_F32_NAME, &VAR_F64_DATA).unwrap_err()
+        );
+        file_writer.close().unwrap();
+    }
+    assert_eq!(true,                        test_file_path.exists());
+
+    // Then read the outlet variable
+    {
+        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        assert_eq!(true,                    file_reader.data_set().has_var(VAR_F64_NAME));
+        {
+            let var: &Variable = file_reader.data_set().get_var(VAR_F64_NAME).unwrap();
+            assert_eq!(DataType::F64,        var.data_type());
+        }
+
+        let var_data: Vec<f64> = file_reader.read_var_f64(VAR_F64_NAME).unwrap();
+        file_reader.close();
+        assert_eq!(vec![NC_FILL_F64; VAR_F64_SIZE],    var_data);
+    }
+
+    tmp_dir.close().unwrap();
 }

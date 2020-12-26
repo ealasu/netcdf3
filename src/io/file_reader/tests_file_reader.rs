@@ -42,7 +42,7 @@ const TEMP_F64_VAR_DATA: [f64; 30] = [0., 1., 2., 3., 4., 5., 6., 7., 8., 9., 10
 const TEMP_F64_VAR_LEN: usize = TEMP_F64_VAR_DATA.len();
 
 #[test]
-fn test_file_reader_read_var_i8() {
+fn test_read_var_i8() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -88,7 +88,7 @@ fn test_file_reader_read_var_i8() {
 }
 
 #[test]
-fn test_file_reader_read_var_u8() {
+fn test_read_var_u8() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -134,7 +134,7 @@ fn test_file_reader_read_var_u8() {
 }
 
 #[test]
-fn test_file_reader_read_var_i16() {
+fn test_read_var_i16() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -179,7 +179,7 @@ fn test_file_reader_read_var_i16() {
 }
 
 #[test]
-fn test_file_reader_read_var_i32() {
+fn test_read_var_i32() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -224,7 +224,7 @@ fn test_file_reader_read_var_i32() {
 }
 
 #[test]
-fn test_file_reader_read_var_f32() {
+fn test_read_var_f32() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -269,7 +269,7 @@ fn test_file_reader_read_var_f32() {
 }
 
 #[test]
-fn test_file_reader_read_var_f64() {
+fn test_read_var_f64() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -1346,7 +1346,7 @@ fn test_read_indeterminated_num_records() {
 }
 
 #[test]
-fn test_file_reader_read_record_i8() {
+fn test_read_record_i8() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -1405,7 +1405,7 @@ fn test_file_reader_read_record_i8() {
 }
 
 #[test]
-fn test_file_reader_read_record_u8() {
+fn test_read_record_u8() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -1464,7 +1464,7 @@ fn test_file_reader_read_record_u8() {
 }
 
 #[test]
-fn test_file_reader_read_record_i16() {
+fn test_read_record_i16() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -1523,7 +1523,7 @@ fn test_file_reader_read_record_i16() {
 }
 
 #[test]
-fn test_file_reader_read_record_i32() {
+fn test_read_record_i32() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -1582,7 +1582,7 @@ fn test_file_reader_read_record_i32() {
 }
 
 #[test]
-fn test_file_reader_read_record_f32() {
+fn test_read_record_f32() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
@@ -1641,7 +1641,7 @@ fn test_file_reader_read_record_f32() {
 }
 
 #[test]
-fn test_file_reader_read_record_f64() {
+fn test_read_record_f64() {
     let (tmp_dir, input_data_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
 
     let mut file_reader = FileReader::open(input_data_file_path).unwrap();
