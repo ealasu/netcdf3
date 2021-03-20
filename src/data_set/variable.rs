@@ -8,7 +8,6 @@ use crate::{is_valid_name, Attribute, DataType, Dimension, InvalidDataSet, NC_MA
 use crate::{data_set::dimension::DimensionSize};
 use crate::io::compute_padding_size;
 
-
 /// NetCDF-3 variable
 ///
 /// `Variable` instances are managed by the struct [`DataSet`](struct.DataSet.html).
@@ -203,6 +202,25 @@ impl Variable {
         self.dims.iter().map(|dim: &Rc<Dimension>| {
             dim.name().to_string()
         }).collect()
+    }
+
+    /// Returns the shape of the variable
+    pub fn shape(&self) -> Vec<usize>
+    {
+        let dim_sizes: Vec<usize> = self.dims.iter().map(|dim: &Rc<Dimension>| {
+            dim.size()
+        }).collect();
+        dim_sizes
+    }
+
+    /// Returns the shape of each record
+    pub fn record_shape(&self) -> Vec<usize>
+    {
+        let first_index: usize = if self.is_record_var() { 1 } else { 0 };
+        let record_dim_sizes: Vec<usize> = self.dims.iter().skip(first_index).map(|dim: &Rc<Dimension>| {
+            dim.size()
+        }).collect();
+        record_dim_sizes
     }
 
     /// Returns :

@@ -144,6 +144,8 @@ pub enum WriteError {
     RecordIndexExceeded{index: usize, num_records: usize},
     RecordMismatchDataLength{var_name: String, req: usize, get: usize},
     Unexpected,
+    #[cfg(feature = "ndimarray")]
+    NDimArrayShapeMismatch{var_name: String, expect: Vec<usize>, get: Vec<usize>},
 }
 
 impl std::convert::From<std::io::Error> for WriteError {

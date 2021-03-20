@@ -1,6 +1,9 @@
 mod tests_file_writer;
 mod tests_computed_data_set_metadata;
 
+#[cfg(feature = "ndimarray")]
+use ndarray;
+
 use std::io::{Write, Seek, SeekFrom};
 use std::rc::Rc;
 use std::path::{Path, PathBuf};
@@ -95,6 +98,30 @@ macro_rules! impl_write_typed_var {
             let num_records: usize = header_def.data_set.num_records().unwrap_or(1);
             self.written_records.push((var, (0..num_records).collect()));
             Ok(())
+        }
+    };
+}
+
+#[cfg(feature = "ndimarray")]
+macro_rules! impl_write_typed_var_from_ndarray {
+    ($func_name:ident, $write_typed_var_func: path, $prim_type:ty, $data_type:path) => {
+        pub fn $func_name(&mut self, var_name: &str, array: &ndarray::ArrayD<$prim_type>) -> Result<(), WriteError> {
+            let header_def: &HeaderDefinition = self.header_def.as_ref().ok_or(WriteError::HeaderNotDefined)?;
+            let var: &Variable = header_def.data_set.find_var_from_name(var_name).map_err(|_err| WriteError::VariableNotDefined(var_name.to_owned()))?.1;
+            if var.data_type != $data_type {
+                return Err(WriteError::VariableMismatchDataType{var_name: var_name.to_owned(), req:var.data_type(), get: $data_type });
+            }
+            {
+                let expected_shape: &[usize] = &var.shape();
+                let get_shape: &[usize] = array.shape();
+                if expected_shape != get_shape {
+                    return Err(WriteError::NDimArrayShapeMismatch{var_name: var_name.to_owned(), expect: expected_shape.to_vec(), get: get_shape.to_vec()});
+                }
+            }
+            // Write the `$prim_type` data
+            let owned_array: ndarray::ArrayD<$prim_type> = array.to_owned();
+            let data: &[$prim_type] = owned_array.as_slice().ok_or(WriteError::Unexpected)?;
+            $write_typed_var_func(self, var_name, data)
         }
     };
 }
@@ -440,13 +467,25 @@ impl<'a> FileWriter<'a> {
     impl_write_typed_record!(write_record_f32, FileWriter::write_chunk_f32, f32, DataType::F32);
     impl_write_typed_record!(write_record_f64, FileWriter::write_chunk_f64, f64, DataType::F64);
 
-
     impl_write_typed_chunk_nc_fill!(write_chunk_nc_fill_i8, i8, NC_FILL_I8);
     impl_write_typed_chunk_nc_fill!(write_chunk_nc_fill_u8, u8, NC_FILL_U8);
     impl_write_typed_chunk_nc_fill!(write_chunk_nc_fill_i16, i16, NC_FILL_I16);
     impl_write_typed_chunk_nc_fill!(write_chunk_nc_fill_i32, i32, NC_FILL_I32);
     impl_write_typed_chunk_nc_fill!(write_chunk_nc_fill_f32, f32, NC_FILL_F32);
     impl_write_typed_chunk_nc_fill!(write_chunk_nc_fill_f64, f64, NC_FILL_F64);
+
+    #[cfg(feature = "ndimarray")]
+    impl_write_typed_var_from_ndarray!(write_var_from_ndarray_i8, Self::write_var_i8, i8, DataType::I8);
+    #[cfg(feature = "ndimarray")]
+    impl_write_typed_var_from_ndarray!(write_var_from_ndarray_u8, Self::write_var_u8, u8, DataType::U8);
+    #[cfg(feature = "ndimarray")]
+    impl_write_typed_var_from_ndarray!(write_var_from_ndarray_i16, Self::write_var_i16, i16, DataType::I16);
+    #[cfg(feature = "ndimarray")]
+    impl_write_typed_var_from_ndarray!(write_var_from_ndarray_i32, Self::write_var_i32, i32, DataType::I32);
+    #[cfg(feature = "ndimarray")]
+    impl_write_typed_var_from_ndarray!(write_var_from_ndarray_f32, Self::write_var_f32, f32, DataType::F32);
+    #[cfg(feature = "ndimarray")]
+    impl_write_typed_var_from_ndarray!(write_var_from_ndarray_f64, Self::write_var_f64, f64, DataType::F64);
 
     fn update_written_records(&mut self, var: &'a Variable, records: &[usize]) -> Result<(), WriteError>
     {

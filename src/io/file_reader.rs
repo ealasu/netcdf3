@@ -30,7 +30,8 @@ use nom::{
     branch::alt,
     multi::many_m_n,
 };
-
+#[cfg(feature = "ndimarray")]
+use ndarray;
 
 use crate::{
     data_set::DimensionSize,
@@ -111,7 +112,7 @@ use crate::{
 /// // Get the NetCDf-3 version
 /// // ------------------------
 /// assert_eq!(Version::Classic,                    file_reader.version());
-/// 
+///
 //// // Get the global attributes
 /// // --------------------------
 /// assert_eq!(2,                                   data_set.num_global_attrs());
@@ -166,7 +167,7 @@ use crate::{
 /// let data_set: &DataSet = file_reader.data_set();
 /// assert_eq!(9,                                   variables.len());
 ///
-/// 
+///
 /// assert_eq!(true,                                variables.contains_key(LATITUDE_VAR_NAME));
 /// assert_eq!(DataType::F32,                       variables[LATITUDE_VAR_NAME].data_type());
 /// assert_eq!(Some(&LATITUDE_VAR_DATA[..]),        variables[LATITUDE_VAR_NAME].get_f32());
@@ -174,27 +175,27 @@ use crate::{
 /// assert_eq!(true,                                variables.contains_key(LONGITUDE_VAR_NAME));
 /// assert_eq!(DataType::F32,                       variables[LONGITUDE_VAR_NAME].data_type());
 /// assert_eq!(Some(&LONGITUDE_VAR_DATA[..]),       variables[LONGITUDE_VAR_NAME].get_f32());
-/// 
+///
 /// assert_eq!(true,                                variables.contains_key(TIME_VAR_NAME));
 /// assert_eq!(DataType::F32,                       variables[TIME_VAR_NAME].data_type());
 /// assert_eq!(Some(&TIME_VAR_DATA[..]),            variables[TIME_VAR_NAME].get_f32());
-/// 
+///
 /// assert_eq!(true,                                variables.contains_key(TEMP_I8_VAR_NAME));
 /// assert_eq!(DataType::I8,                        variables[TEMP_I8_VAR_NAME].data_type());
 /// assert_eq!(Some(&TEMP_I8_VAR_DATA[..]),         variables[TEMP_I8_VAR_NAME].get_i8());
-/// 
+///
 /// assert_eq!(true,                                variables.contains_key(TEMP_U8_VAR_NAME));
 /// assert_eq!(DataType::U8,                        variables[TEMP_U8_VAR_NAME].data_type());
 /// assert_eq!(Some(&TEMP_U8_VAR_DATA[..]),         variables[TEMP_U8_VAR_NAME].get_u8());
-/// 
+///
 /// assert_eq!(true,                                variables.contains_key(TEMP_I16_VAR_NAME));
 /// assert_eq!(DataType::I16,                       variables[TEMP_I16_VAR_NAME].data_type());
 /// assert_eq!(Some(&TEMP_I16_VAR_DATA[..]),        variables[TEMP_I16_VAR_NAME].get_i16());
-/// 
+///
 /// assert_eq!(true,                                variables.contains_key(TEMP_I32_VAR_NAME));
 /// assert_eq!(DataType::I32,                       variables[TEMP_I32_VAR_NAME].data_type());
 /// assert_eq!(Some(&TEMP_I32_VAR_DATA[..]),        variables[TEMP_I32_VAR_NAME].get_i32());
-/// 
+///
 /// assert_eq!(true,                                variables.contains_key(TEMP_F32_VAR_NAME));
 /// assert_eq!(DataType::F32,                       variables[TEMP_F32_VAR_NAME].data_type());
 /// assert_eq!(Some(&TEMP_F32_VAR_DATA[..]),        variables[TEMP_F32_VAR_NAME].get_f32());
@@ -235,7 +236,7 @@ macro_rules! impl_read_typed_var {
 
 macro_rules! impl_read_typed_record {
     ($func_name:ident, $prim_type:ty, $data_type:path, $data_vector:path) => {
-        /// Reads the typed records and returns its values into a typed`Vec`.
+        /// Reads the typed records and returns its values into a typed `Vec`.
         pub fn $func_name(&mut self, var_name: &str, record_index: usize) -> Result<Vec<$prim_type>, ReadError>
         {
             let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
@@ -249,6 +250,53 @@ macro_rules! impl_read_typed_record {
                 $data_vector(data) => return Ok(data),
                 _ => return Err(ReadError::Unexpected),  // previously checked
             };
+        }
+    };
+}
+
+#[cfg(feature = "ndimarray")]
+macro_rules! impl_read_typed_var_as_ndarray {
+    ($func_name:ident, $prim_type:ty, $data_type:path, $data_vector:path) => {
+        /// Reads the typed variable and returns its values into a typed N-dimensional array.
+        pub fn $func_name(&mut self, var_name: &str) -> Result<ndarray::ArrayD<$prim_type>, ReadError> {
+            let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
+                ReadError::VariableNotDefined(String::from(var_name))
+            })?;
+            if var.data_type != $data_type {
+                return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: $data_type});
+            }
+            let var_shape: ndarray::IxDyn = ndarray::IxDyn(&var.shape());
+            let data_vec: DataVector = self.read_var(var_name)?;
+            let var_data: Vec<$prim_type> = match data_vec {
+                $data_vector(data) => data,
+                _ => return Err(ReadError::Unexpected),  // previously checked
+            };
+            let array: ndarray::ArrayD<$prim_type> = ndarray::ArrayD::<$prim_type>::from_shape_vec(var_shape, var_data).map_err(|_err| ReadError::Unexpected)?;  // previously checked
+            Ok(array)
+        }
+    };
+}
+
+#[cfg(feature = "ndimarray")]
+macro_rules! impl_read_typed_record_as_ndarray {
+    ($func_name:ident, $prim_type:ty, $data_type:path, $data_vector:path) => {
+        /// Reads the typed record and returns its values into a typed N-dimensional array.
+        pub fn $func_name(&mut self, var_name: &str, record_index: usize) -> Result<ndarray::ArrayD<$prim_type>, ReadError>
+        {
+            let (_var_index, var): (usize, &Variable) = self.data_set.find_var_from_name(var_name).map_err(|_err|{
+                ReadError::VariableNotDefined(String::from(var_name))
+            })?;
+            if var.data_type != $data_type {
+                return Err(ReadError::VariableMismatchDataType{var_name: String::from(var_name), req: var.data_type.clone(), get: $data_type});
+            }
+            let record_shape: ndarray::IxDyn =  ndarray::IxDyn(&var.record_shape());
+            let data_vec: DataVector = self.read_record(var_name, record_index)?;
+            let record_data: Vec<$prim_type> = match data_vec {
+                $data_vector(data) => data,
+                _ => return Err(ReadError::Unexpected),  // previously checked
+            };
+            let array: ndarray::ArrayD<$prim_type> = ndarray::ArrayD::<$prim_type>::from_shape_vec(record_shape, record_data).map_err(|_err| ReadError::Unexpected)?;  // previously checked
+            Ok(array)
         }
     };
 }
@@ -281,8 +329,8 @@ impl FileReader {
             path
         };
         let mut input_file = std::fs::File::open(input_file_path.clone())?;
-        let file_size: usize = std::fs::metadata(&input_file_path)?.len() as usize; 
-        
+        let file_size: usize = std::fs::metadata(&input_file_path)?.len() as usize;
+
         // Parse the header
         let (data_set, version, vars_info): (DataSet, Version, Vec<VariableParsedMetadata>) = {
             let mut buffer: Vec<u8> = vec![];
@@ -384,7 +432,7 @@ impl FileReader {
     /// {
     ///     let latitudes: DataVector = file_reader.read_var(LATITUDE_VAR_NAME).unwrap();
     ///     assert_eq!(DataType::F32,                           latitudes.data_type());
-    /// 
+    ///
     ///     assert_eq!(None,                                    latitudes.get_i8());
     ///     assert_eq!(None,                                    latitudes.get_u8());
     ///     assert_eq!(None,                                    latitudes.get_i16());
@@ -392,7 +440,7 @@ impl FileReader {
     ///     assert_eq!(Some(&LATITUDE_VAR_DATA[..]),            latitudes.get_f32());
     ///     assert_eq!(None,                                    latitudes.get_f64());
     /// }
-    /// 
+    ///
     /// // using the method `FileReader::read_var_f32`
     /// {
     ///     let latitudes: Vec<f32> = file_reader.read_var_f32(LATITUDE_VAR_NAME).unwrap();
@@ -500,6 +548,32 @@ impl FileReader {
     impl_read_typed_record!(read_record_i32, i32, DataType::I32, DataVector::I32);
     impl_read_typed_record!(read_record_f32, f32, DataType::F32, DataVector::F32);
     impl_read_typed_record!(read_record_f64, f64, DataType::F64, DataVector::F64);
+
+    #[cfg(feature = "ndimarray")]
+    impl_read_typed_var_as_ndarray!(read_var_as_ndarray_i8, i8, DataType::I8, DataVector::I8);
+    #[cfg(feature = "ndimarray")]
+    impl_read_typed_var_as_ndarray!(read_var_as_ndarray_u8, u8, DataType::U8, DataVector::U8);
+    #[cfg(feature = "ndimarray")]
+    impl_read_typed_var_as_ndarray!(read_var_as_ndarray_i16, i16, DataType::I16, DataVector::I16);
+    #[cfg(feature = "ndimarray")]
+    impl_read_typed_var_as_ndarray!(read_var_as_ndarray_i32, i32, DataType::I32, DataVector::I32);
+    #[cfg(feature = "ndimarray")]
+    impl_read_typed_var_as_ndarray!(read_var_as_ndarray_f32, f32, DataType::F32, DataVector::F32);
+    #[cfg(feature = "ndimarray")]
+    impl_read_typed_var_as_ndarray!(read_var_as_ndarray_f64, f64, DataType::F64, DataVector::F64);
+
+    #[cfg(feature = "ndimarray")]
+    impl_read_typed_record_as_ndarray!(read_record_as_ndarray_i8, i8, DataType::I8, DataVector::I8);
+    #[cfg(feature = "ndimarray")]
+    impl_read_typed_record_as_ndarray!(read_record_as_ndarray_u8, u8, DataType::U8, DataVector::U8);
+    #[cfg(feature = "ndimarray")]
+    impl_read_typed_record_as_ndarray!(read_record_as_ndarray_i16, i16, DataType::I16, DataVector::I16);
+    #[cfg(feature = "ndimarray")]
+    impl_read_typed_record_as_ndarray!(read_record_as_ndarray_i32, i32, DataType::I32, DataVector::I32);
+    #[cfg(feature = "ndimarray")]
+    impl_read_typed_record_as_ndarray!(read_record_as_ndarray_f32, f32, DataType::F32, DataVector::F32);
+    #[cfg(feature = "ndimarray")]
+    impl_read_typed_record_as_ndarray!(read_record_as_ndarray_f64, f64, DataType::F64, DataVector::F64);
 
     /// Parses the NetCDF-3 header
     fn parse_header(input: &[u8], total_file_size: usize) -> Result<(DataSet, Version, Vec<VariableParsedMetadata>), ReadError> {
@@ -631,6 +705,7 @@ impl FileReader {
             ParseHeaderError::new(err, ParseHeaderErrorKind::MagicWord)
         })?;
         Ok((input, tag_value))
+
     }
 
     fn parse_version(input: &[u8]) -> Result<(&[u8], Version), ParseHeaderError>
