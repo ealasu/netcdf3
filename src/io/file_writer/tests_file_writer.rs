@@ -53,7 +53,7 @@ fn test_file_writer_open() {
     assert_eq!(true,                test_file_path.exists());
 
     // Read the outlet file
-    let file_reader: FileReader = FileReader::open(&test_file_path).unwrap();
+    let file_reader = FileReader::open(&test_file_path).unwrap();
     let data_set_3: DataSet = file_reader.close().0;
     assert_eq!(1,                   data_set_3.num_global_attrs());
     assert_eq!(false,               data_set_3.has_global_attr(GLOBAL_ATTR_NAME_1));
@@ -88,7 +88,7 @@ fn test_file_writer_create_new() {
     assert_eq!(true,                test_file_path.exists());
 
     // The first file has not been overwritten
-    let file_reader: FileReader = FileReader::open(&test_file_path).unwrap();
+    let file_reader = FileReader::open(&test_file_path).unwrap();
     let data_set_2: DataSet = file_reader.close().0;
     assert_eq!(1,                   data_set_2.num_global_attrs());
     assert_eq!(true,                data_set_2.has_global_attr(GLOBAL_ATTR_NAME));
@@ -136,7 +136,7 @@ fn test_file_writer_fill_missing_data_at_closing() {
 
     // Then read the outlet file
     {
-        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        let mut file_reader = FileReader::open(test_file_path).unwrap();
 
         let data_i8: Vec<i8> = file_reader.read_var_i8(VAR_I8_NAME).unwrap();
         let data_u8: Vec<u8> = file_reader.read_var_u8(VAR_U8_NAME).unwrap();
@@ -191,7 +191,7 @@ fn test_file_writer_write_record_i8() {
 
     // Then read the outlet file
     {
-        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        let mut file_reader = FileReader::open(test_file_path).unwrap();
         assert_eq!(true,                    file_reader.data_set().has_var(VAR_I8_NAME));
         let chunk_len: usize;
         {
@@ -300,7 +300,7 @@ fn test_file_writer_write_record_i8_errors() {
 
     // Then read the outlet variable
     {
-        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        let mut file_reader = FileReader::open(test_file_path).unwrap();
         assert_eq!(true,                    file_reader.data_set().has_var(VAR_I8_NAME));
         let chunk_len: usize;
         {
@@ -356,7 +356,7 @@ fn test_file_writer_write_record_u8() {
 
     // Then read the outlet file
     {
-        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        let mut file_reader = FileReader::open(test_file_path).unwrap();
         assert_eq!(true,                    file_reader.data_set().has_var(VAR_U8_NAME));
         let chunk_len: usize;
         {
@@ -467,7 +467,7 @@ fn test_file_writer_write_record_u8_errors() {
 
     // Then read the outlet variable
     {
-        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        let mut file_reader = FileReader::open(test_file_path).unwrap();
         assert_eq!(true,                    file_reader.data_set().has_var(VAR_U8_NAME));
         let chunk_len: usize;
         {
@@ -523,7 +523,7 @@ fn test_file_writer_write_record_i16() {
 
     // Then read the outlet file
     {
-        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        let mut file_reader = FileReader::open(test_file_path).unwrap();
         assert_eq!(true,                    file_reader.data_set().has_var(VAR_I16_NAME));
         let chunk_len: usize;
         {
@@ -633,7 +633,7 @@ fn test_file_writer_write_record_i16_errors() {
 
     // Then read the outlet variable
     {
-        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        let mut file_reader = FileReader::open(test_file_path).unwrap();
         assert_eq!(true,                    file_reader.data_set().has_var(VAR_I16_NAME));
         let chunk_len: usize;
         {
@@ -689,7 +689,7 @@ fn test_file_writer_write_record_i32() {
 
     // Then read the outlet file
     {
-        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        let mut file_reader = FileReader::open(test_file_path).unwrap();
         assert_eq!(true,                    file_reader.data_set().has_var(VAR_I32_NAME));
         let chunk_len: usize;
         {
@@ -799,7 +799,7 @@ fn test_file_writer_write_record_i32_errors() {
 
     // Then read the outlet variable
     {
-        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        let mut file_reader = FileReader::open(test_file_path).unwrap();
         assert_eq!(true,                    file_reader.data_set().has_var(VAR_I32_NAME));
         let chunk_len: usize;
         {
@@ -855,7 +855,7 @@ fn test_file_writer_write_record_f32() {
 
     // Then read the outlet file
     {
-        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        let mut file_reader = FileReader::open(test_file_path).unwrap();
         assert_eq!(true,                    file_reader.data_set().has_var(VAR_F32_NAME));
         let chunk_len: usize;
         {
@@ -965,7 +965,7 @@ fn test_file_writer_write_record_f32_errors() {
 
     // Then read the outlet variable
     {
-        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        let mut file_reader = FileReader::open(test_file_path).unwrap();
         assert_eq!(true,                    file_reader.data_set().has_var(VAR_F32_NAME));
         let chunk_len: usize;
         {
@@ -1022,7 +1022,7 @@ fn test_file_writer_write_record_f64() {
 
     // Then read the outlet file
     {
-        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        let mut file_reader = FileReader::open(test_file_path).unwrap();
         assert_eq!(true,                    file_reader.data_set().has_var(VAR_F64_NAME));
         let chunk_len: usize;
         {
@@ -1132,7 +1132,7 @@ fn test_file_writer_write_record_f64_errors() {
 
     // Then read the outlet variable
     {
-        let mut file_reader: FileReader = FileReader::open(test_file_path).unwrap();
+        let mut file_reader = FileReader::open(test_file_path).unwrap();
         assert_eq!(true,                    file_reader.data_set().has_var(VAR_F64_NAME));
         let chunk_len: usize;
         {

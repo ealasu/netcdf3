@@ -3,8 +3,9 @@ mod tests_file_reader;
 use std::convert::TryFrom;
 use std::rc::Rc;
 use std::io::{Read, Seek, SeekFrom};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::collections::HashMap;
+use std::fs::File;
 
 use byteorder::{ReadBytesExt, BigEndian};
 
@@ -104,7 +105,7 @@ use crate::{
 ///
 /// // Open the file and read the header
 /// // ---------------------------------
-/// let mut file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+/// let mut file_reader = FileReader::open(input_file_path).unwrap();
 ///
 /// let data_set: &DataSet = file_reader.data_set();
 ///
@@ -206,11 +207,10 @@ use crate::{
 /// # tmp_dir.close();
 /// ```
 #[derive(Debug)]
-pub struct FileReader {
+pub struct FileReader<T> {
     data_set: DataSet,
     version: Version,
-    input_file_path: PathBuf,
-    input_file: std::fs::File,
+    input_file: T,
     vars_info: Vec<VariableParsedMetadata>
 }
 
@@ -253,7 +253,15 @@ macro_rules! impl_read_typed_record {
     };
 }
 
-impl FileReader {
+impl FileReader<File> {
+    /// Opens the file and parses the header of the NetCDF-3.
+    pub fn open<P: AsRef<Path>>(input_file_path: P) -> Result<Self, ReadError> {
+        let file = File::open(input_file_path)?;
+        FileReader::<File>::open_stream(file)
+    }
+}
+
+impl <T: Read + Seek> FileReader<T> {
 
     /// Returns the data set managed by the reader.
     pub fn data_set(&self) -> &DataSet {
@@ -264,24 +272,11 @@ impl FileReader {
         return self.version.clone();
     }
 
-    /// Returns the data set managed by the reader.
-    pub fn file_path(&self) -> &std::path::Path
-    {
-        return &self.input_file_path;
-    }
-
-    /// Opens the file and parses the header of the NetCDF-3.
-    pub fn open<P: AsRef<Path>>(input_file_path: P) -> Result<Self, ReadError>
+    pub fn open_stream(mut input_file: T) -> Result<Self, ReadError>
     {
         const BUFFER_SIZE: usize = 1024;
-        // Open the file
-        let input_file_path: PathBuf = {
-            let mut path = PathBuf::new();
-            path.push(input_file_path);
-            path
-        };
-        let mut input_file = std::fs::File::open(input_file_path.clone())?;
-        let file_size: usize = std::fs::metadata(&input_file_path)?.len() as usize; 
+	let file_size = input_file.seek(SeekFrom::End(0))? as usize;
+	input_file.seek(SeekFrom::Start(0))?;
         
         // Parse the header
         let (data_set, version, vars_info): (DataSet, Version, Vec<VariableParsedMetadata>) = {
@@ -297,7 +292,7 @@ impl FileReader {
                 let _num_of_bytes = input_file.read(&mut buffer[*start..*end])?;
 
                 let parsing_result: Result<(DataSet, Version, Vec<VariableParsedMetadata>), ReadError>;
-                parsing_result = FileReader::parse_header(&buffer, file_size);
+                parsing_result = parse_header(&buffer, file_size);
                 match parsing_result {
                     Ok((data_set_2, version_2, vars_info_2)) => {
                         data_set = data_set_2;
@@ -328,7 +323,6 @@ impl FileReader {
         return Ok(FileReader{
             data_set: data_set,
             version: version,
-            input_file_path: input_file_path,
             input_file: input_file,
             vars_info: vars_info,  // convert the list of tuples to a map
         })
@@ -371,7 +365,7 @@ impl FileReader {
     /// # // Copy bytes to an temporary file
     /// # let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
     ///
-    /// let mut file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+    /// let mut file_reader = FileReader::open(input_file_path).unwrap();
     ///
     /// // Open the file
     /// // -------------
@@ -501,374 +495,375 @@ impl FileReader {
     impl_read_typed_record!(read_record_f32, f32, DataType::F32, DataVector::F32);
     impl_read_typed_record!(read_record_f64, f64, DataType::F64, DataVector::F64);
 
-    /// Parses the NetCDF-3 header
-    fn parse_header(input: &[u8], total_file_size: usize) -> Result<(DataSet, Version, Vec<VariableParsedMetadata>), ReadError> {
-        // the magic word
-        let (input, _): (&[u8], &[u8]) = FileReader::parse_magic_word(input)?;
-        // the version number
-        let (input, version) : (&[u8], Version) = FileReader::parse_version(input)?;
-
-        // the number of records
-        let (input, num_records): (&[u8], Option<usize>) = FileReader::parse_as_usize_optional(input)?;
-        let (input, dims_list): (&[u8], Vec<(String, usize)>) = FileReader::parse_dims_list(input)?;
-        let (input, global_attrs_list): (&[u8], Vec<_>) = FileReader::parse_attrs_list(input)?;
-        let (_input, var_info_list): (&[u8], Vec<VariableParsedMetadata>) = FileReader::parse_vars_list(input, version.clone())?;
-
-        // Create a new dataset
-        let mut data_set = DataSet::new();
-        let (num_records, num_records_is_determinated): (usize, bool) = match num_records {
-            Some(num_records) => (num_records, true),
-            None => (0, false),
-        };
-
-        // Append it the dimensions
-        for (dim_name, dim_size) in dims_list.into_iter() {
-            if dim_size == 0 {
-                data_set.set_unlimited_dim(dim_name, num_records)?;
-            } else {
-                data_set.add_fixed_dim(dim_name, dim_size)?;
-            }
-        }
-
-        // Append ot the global attributes
-        for (attr_name, attr_data) in global_attrs_list.into_iter() {
-            use DataVector::*;
-            match attr_data {
-                I8(data) => {
-                    data_set.add_global_attr_i8(&attr_name, data)?;
-                }
-                U8(data) => {
-                    data_set.add_global_attr_u8(&attr_name, data)?;
-                }
-                I16(data) => {
-                    data_set.add_global_attr_i16(&attr_name, data)?;
-                }
-                I32(data) => {
-                    data_set.add_global_attr_i32(&attr_name, data)?;
-                }
-                F32(data) => {
-                    data_set.add_global_attr_f32(&attr_name, data)?
-                }
-                F64(data) => {
-                    data_set.add_global_attr_f64(&attr_name, data)?;
-                }
-            }
-        }
-
-        // Append the variables
-        let mut record_var_begin_offsets: Vec<Offset> = vec![];  // used to computed the number of records if necessaray
-        for var_info in var_info_list.iter() {
-            let dim_refs: Vec<Rc<Dimension>> = data_set.get_dims_from_dim_ids(&var_info.dim_ids)?;
-            // Create the variable the variable
-            let var: &Variable = data_set.add_var_using_dim_refs(&var_info.name, dim_refs, var_info.data_type.clone())?;
-            // Keep the `begin_offset` of the variable
-            if var.is_record_var() {
-                record_var_begin_offsets.push(var_info.begin_offset.clone());
-            }
-            // Append variable attributes
-            let var_name: String = var_info.name.clone();
-            for (attr_name, attr_data) in var_info.attrs_list.iter() {
-                use DataVector::*;
-                match attr_data {
-                    I8(data) => {
-                        data_set.add_var_attr_i8(&var_name, &attr_name, data.clone())?;
-                    }
-                    U8(data) => {
-                        data_set.add_var_attr_u8(&var_name, &attr_name, data.clone())?;
-                    }
-                    I16(data) => {
-                        data_set.add_var_attr_i16(&var_name, &attr_name, data.clone())?;
-                    }
-                    I32(data) => {
-                        data_set.add_var_attr_i32(&var_name, &attr_name, data.clone())?;
-                    }
-                    F32(data) => {
-                        data_set.add_var_attr_f32(&var_name, &attr_name, data.clone())?;
-                    }
-                    F64(data) => {
-                        data_set.add_var_attr_f64(&var_name, &attr_name, data.clone())?;
-                    }
-                }
-            }
-        }
-
-        if !num_records_is_determinated {
-            // Case an *unlimited-size* dim s defined
-            if let Some(dim) = data_set.get_unlimited_dim() {
-                let num_records: usize;
-                // Case: the unlimited dim  is defined but no record variable is defined
-                if record_var_begin_offsets.is_empty() {
-                    num_records = 0;
-                }
-                else {
-                    // Computation of the number of records
-                    let first_begin_offset: usize = record_var_begin_offsets.into_iter().map(|begin_offset: Offset| i64::from(begin_offset) as usize).min().unwrap();
-                    let all_records_size: usize = total_file_size - first_begin_offset; // the size allocated for all record data
-                    let record_size: usize = data_set.record_size().ok_or(ReadError::Unexpected)?;
-                    if record_size == 0 {  // cannot be zero
-                        return Err(ReadError::Unexpected);
-                    }
-                    num_records = all_records_size.checked_div_euclid(record_size).ok_or(ReadError::Unexpected)?;
-                    let num_rem_bytes: usize = all_records_size.checked_rem_euclid(record_size).ok_or(ReadError::Unexpected)?;  // the number of remaining bytes
-                    if num_rem_bytes != 0 {
-                        return Err(ReadError::ComputationNumberOfRecords);
-                    }
-                }
-                match &dim.size {
-                    DimensionSize::Unlimited(dim_size) => {
-                        dim_size.replace(num_records);
-                    },
-                    _ => {},
-                }
-            }
-        }
-        Ok((data_set, version, var_info_list))
-    }
-
-    fn parse_magic_word(input: &[u8]) -> Result<(&[u8], &[u8]), ParseHeaderError>
-    {
-        let (input, tag_value): (&[u8], &[u8]) = tag(&b"CDF"[..])(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseHeaderErrorKind::MagicWord)
-        })?;
-        Ok((input, tag_value))
-    }
-
-    fn parse_version(input: &[u8]) -> Result<(&[u8], Version), ParseHeaderError>
-    {
-        let (input, version_number): (&[u8], u8) = verify(be_u8, |ver_num: &u8|{
-            ver_num == &(Version::Classic as u8) || ver_num == &(Version::Offset64Bit as u8)
-        })(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseHeaderErrorKind::VersionNumber)
-        })?;
-        let version = Version::try_from(version_number).unwrap();  // previously checked
-        Ok((input, version))
-    }
-
-    /// Parses a `i32` word and checks that it is non-negative.
-    fn parse_non_neg_i32(input: &[u8]) -> Result<(&[u8], i32), ParseHeaderError> {
-        verify(be_i32, |number: &i32| *number >= 0_i32)(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseHeaderErrorKind::NonNegativeI32)
-        })
-    }
-
-    /// Parses a non-negative `i32` word and converts it to a `usize`.
-    fn parse_as_usize(input: &[u8]) -> Result<(&[u8], usize), ParseHeaderError> {
-        let (input, number): (&[u8], i32) = FileReader::parse_non_neg_i32(input)?;
-        Ok((input, number as usize))
-    }
-
-    /// Parses the number of records
-    ///
-    /// Returns :
-    /// - The numbers of records if it is a valid integer.
-    /// - `None` if the number of records is indeterminated
-    fn parse_as_usize_optional(input: &[u8]) -> Result<(&[u8], Option<usize>), ParseHeaderError> {
-        const INDETERMINATE_VALUE: u32 = std::u32::MAX;
-        let (input, value): (&[u8], u32) = verify(be_u32, |number: &u32| *number <= (std::i32::MAX as u32) || *number == INDETERMINATE_VALUE)(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseHeaderErrorKind::NonNegativeI32)
-        })?;
-        let value: Option<usize> = match value {
-            INDETERMINATE_VALUE => None,
-            _ => Some(value as usize),
-        };
-        Ok((input, value))
-    }
-
-    /// Parses a non-negative `i32` word and converts it to a `u32`.
-    fn parse_as_u32(input: &[u8]) -> Result<(&[u8], u32), ParseHeaderError> {
-        let (input, number): (&[u8], i32) = FileReader::parse_non_neg_i32(input)?;
-        Ok((input, number as u32))
-    }
-    /// Parses a string
-    fn parse_name_string(input: &[u8]) -> Result<(&[u8], String), ParseHeaderError>
-    {
-        let (input, num_of_bytes): (&[u8], usize) = FileReader::parse_as_usize(input)?;
-        let (input, name): (&[u8], String) = map_res(take(num_of_bytes), |bytes: &[u8]| {
-            String::from_utf8(bytes.to_vec())
-        })(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseHeaderErrorKind::Utf8)
-        })?;
-        // Take the zero padding bytes if necessary
-        let (input, _zero_padding_bytes): (&[u8], &[u8]) = FileReader::parse_zero_padding(input, compute_padding_size(num_of_bytes))?;
-        Ok((input, name))
-    }
-
-    // Parses a NetCDF-3 data type.
-    fn parse_data_type(input: &[u8]) -> Result<(&[u8], DataType), ParseHeaderError>
-    {
-        let start: &[u8] = input;
-        let (input, data_type_number): (&[u8], u32) = FileReader::parse_as_u32(input)?;
-        let data_type: DataType = DataType::try_from(data_type_number).map_err(|_err|{
-            nom::Err::Error((&start[0..4], nom::error::ErrorKind::Verify))
-        }).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseHeaderErrorKind::DataType)
-        })?;
-        Ok((input, data_type))
-    }
-
-    fn parse_typed_data_elements(input: &[u8], num_of_elements: usize, data_type: DataType) -> Result<(&[u8], DataVector), ParseHeaderError>
-    {
-        // Parsed the useful data
-        let (input, data_vector): (&[u8], DataVector) = match data_type {
-            DataType::I8 => many_m_n(num_of_elements, num_of_elements, be_i8)(input).map(|(input, data): (&[u8], Vec<i8>)| (input, DataVector::I8(data))),
-            DataType::U8 => many_m_n(num_of_elements, num_of_elements, be_u8)(input).map(|(input, data): (&[u8], Vec<u8>)| (input, DataVector::U8(data))),
-            DataType::I16 => many_m_n(num_of_elements, num_of_elements, be_i16)(input).map(|(input, data): (&[u8], Vec<i16>)| (input, DataVector::I16(data))),
-            DataType::I32 => many_m_n(num_of_elements, num_of_elements, be_i32)(input).map(|(input, data): (&[u8], Vec<i32>)| (input, DataVector::I32(data))),
-            DataType::F32 => many_m_n(num_of_elements, num_of_elements, be_f32)(input).map(|(input, data): (&[u8], Vec<f32>)| (input, DataVector::F32(data))),
-            DataType::F64 => many_m_n(num_of_elements, num_of_elements, be_f64)(input).map(|(input, data): (&[u8], Vec<f64>)| (input, DataVector::F64(data))),
-        }.map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseHeaderErrorKind::DataElements)
-        })?;
-
-        // Parse the zero padding bytes if necessary
-        let num_of_bytes: usize = data_type.size_of() * num_of_elements;
-        let (input, _zero_padding_bytes): (&[u8], &[u8]) = FileReader::parse_zero_padding(input, compute_padding_size(num_of_bytes))?;
-        Ok((input, data_vector))
-    }
-
-    fn parse_zero_padding(input: &[u8], num_bytes: usize) -> Result<(&[u8], &[u8]), ParseHeaderError>
-    {
-        verify(take(num_bytes), |padding_bytes: &[u8]| {
-            padding_bytes.iter().all(|byte: &u8| {
-                *byte == 0_u8
-            })
-        })(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseHeaderErrorKind::ZeroPadding)
-        })
-    }
-
-    // Parses the list of the dimensions from the header.
-    fn parse_dims_list(input: &[u8]) -> Result<(&[u8], Vec<(String, usize)>), ParseHeaderError>
-    {
-        fn parse_dim(input: &[u8]) -> Result<(&[u8], (String, usize)), ParseHeaderError>
-        {
-            let (input, dim_name): (&[u8], String) = FileReader::parse_name_string(input)?;
-            let (input, dim_size): (&[u8], usize) = FileReader::parse_as_usize(input)?;
-            Ok((input, (dim_name, dim_size)))
-        }
-        let (input, dim_tag): (&[u8], &[u8]) = alt((tag(ABSENT_TAG), tag(DIMENSION_TAG)))(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseHeaderErrorKind::DimTag)
-        })?;
-        if dim_tag == &ABSENT_TAG {
-            return Ok((input, vec![]));
-        }
-        let (mut input, num_of_dims): (&[u8], usize) = FileReader::parse_as_usize(input)?;
-        let mut dims_list: Vec<(String, usize)> = Vec::with_capacity(num_of_dims);
-        for _ in 0..num_of_dims{
-            let (rem_input, dim): (&[u8], (String, usize)) = parse_dim(input)?;
-            input = rem_input;
-            dims_list.push(dim);
-        }
-
-        Ok((input, dims_list))
-    }
-
-    // Parses a list of attributes (global of from any variables) from the header.
-    fn parse_attrs_list(input: &[u8]) -> Result<(&[u8], Vec<(String, DataVector)>), ParseHeaderError>
-    {
-        fn parse_attr(input: &[u8]) -> Result<(&[u8], (String, DataVector)), ParseHeaderError>
-        {
-            let (input, attr_name): (&[u8], String) = FileReader::parse_name_string(input)?;
-            let (input, attr_data_type): (&[u8], DataType) = FileReader::parse_data_type(input)?;
-            let (input, num_of_elements): (&[u8], usize) = FileReader::parse_as_usize(input)?;
-            let (input, attr_data): (&[u8], DataVector) = FileReader::parse_typed_data_elements(input, num_of_elements, attr_data_type)?;
-            Ok((input, (attr_name, attr_data)))
-        }
-        let (input, attr_tag): (&[u8], &[u8]) = alt((tag(ABSENT_TAG), tag(ATTRIBUTE_TAG)))(input).map_err(|err: NomError|{
-            ParseHeaderError::new(err, ParseHeaderErrorKind::AttrTag)
-        })?;
-        if attr_tag == &ABSENT_TAG {
-            return Ok((input, vec![]));
-        }
-        let (mut input, num_of_attrs): (&[u8], usize) = FileReader::parse_as_usize(input)?;
-        let mut attrs_list: Vec<(String, DataVector)> = Vec::with_capacity(num_of_attrs);
-        for _ in 0..num_of_attrs
-        {
-            let (rem_input, attr): (&[u8], (String, DataVector)) = parse_attr(input)?;
-            input = rem_input;
-            attrs_list.push(attr);
-        }
-        Ok((input, attrs_list))
-    }
-
-    // Parses a list of variables from the header.
-    fn parse_vars_list(input: &[u8], version: Version) -> Result<(&[u8], Vec<VariableParsedMetadata>), ParseHeaderError>
-    {
-        fn parse_dim_ids_list(input: &[u8]) -> Result<(&[u8], Vec<usize>), ParseHeaderError>
-        {
-                // number of dimensions
-                let (mut input, num_of_dims): (&[u8], usize) = FileReader::parse_as_usize(input)?;
-                // list of the dimension ids
-                let mut dim_ids_list: Vec<usize> = Vec::with_capacity(num_of_dims);
-                for _ in 0..num_of_dims {
-                    let(rem_input, dim_id): (&[u8], usize) = FileReader::parse_as_usize(input)?;
-                    input = rem_input;
-                    dim_ids_list.push(dim_id);
-                }
-                Ok((input, dim_ids_list))
-        }
-
-        fn parse_offset(input: &[u8], version: Version) -> Result<(&[u8], Offset), ParseHeaderError>
-        {
-            match version {
-                Version::Classic => {
-                    be_i32(input).map(|(input, num_of_bytes): (&[u8], i32)| {
-                        (input, Offset::I32(num_of_bytes))
-                    })
-                },
-                Version::Offset64Bit => {
-                    be_i64(input).map(|(input, num_of_bytes): (&[u8], i64)| {
-                        (input, Offset::I64(num_of_bytes))
-                    })
-                },
-            }.map_err(|err: NomError| {
-                ParseHeaderError::new(err, ParseHeaderErrorKind::Offset)
-            })
-        }
-
-        fn parse_var(input: &[u8], version: Version) -> Result<(&[u8], VariableParsedMetadata), ParseHeaderError> {
-            // Variable name
-            let (input, var_name): (&[u8], String) = FileReader::parse_name_string(input)?;
-
-            // list of the dimensions
-            let (input, dim_ids): (&[u8], Vec<usize>) = parse_dim_ids_list(input)?;
-            // list of the variable attributes
-            let (input, attrs_list): (&[u8], Vec<(String, DataVector)>) = FileReader::parse_attrs_list(input)?;
-            // data type of the variable
-            let (input, data_type): (& [u8], DataType) = FileReader::parse_data_type(input)?;
-            // size occupied in each record by the variable (number of bytes)
-            let (input, chunk_size): (&[u8], Option<usize>) = FileReader::parse_as_usize_optional(input)?;
-            // begin offset (number of bytes)
-            let (input, begin_offset): (&[u8], Offset) = parse_offset(input, version)?;
-            let var_def = VariableParsedMetadata {
-                name: var_name,
-                dim_ids: dim_ids,
-                attrs_list: attrs_list,
-                data_type: data_type,
-                _chunk_size: chunk_size,
-                begin_offset: begin_offset,
-            };
-            return Ok((input, var_def));
-        }
-        let (input, var_tag): (&[u8], &[u8]) = alt((tag(ABSENT_TAG), tag(VARIABLE_TAG)))(input).map_err(|err: NomError| {
-            ParseHeaderError::new(err, ParseHeaderErrorKind::VarTag)
-        })?;
-        if var_tag == &ABSENT_TAG {
-            return Ok((input, vec![]));
-        }
-        let (mut input, num_of_vars): (&[u8], usize) = FileReader::parse_as_usize(input)?;
-        let mut vars_list: Vec<VariableParsedMetadata> = vec![];
-        for _ in 0..num_of_vars {
-            let (temp_input, var) = parse_var(input, version.clone())?;
-            input = temp_input;
-            vars_list.push(var);
-        }
-        Ok((input, vars_list))
-    }
-
     fn find_var_info(&self, var_name: &str) -> Option<&VariableParsedMetadata> {
         self.vars_info.iter().find(|var_info| var_info.name == var_name)
     }
+}
+
+
+/// Parses the NetCDF-3 header
+fn parse_header(input: &[u8], total_file_size: usize) -> Result<(DataSet, Version, Vec<VariableParsedMetadata>), ReadError> {
+    // the magic word
+    let (input, _): (&[u8], &[u8]) = parse_magic_word(input)?;
+    // the version number
+    let (input, version) : (&[u8], Version) = parse_version(input)?;
+
+    // the number of records
+    let (input, num_records): (&[u8], Option<usize>) = parse_as_usize_optional(input)?;
+    let (input, dims_list): (&[u8], Vec<(String, usize)>) = parse_dims_list(input)?;
+    let (input, global_attrs_list): (&[u8], Vec<_>) = parse_attrs_list(input)?;
+    let (_input, var_info_list): (&[u8], Vec<VariableParsedMetadata>) = parse_vars_list(input, version.clone())?;
+
+    // Create a new dataset
+    let mut data_set = DataSet::new();
+    let (num_records, num_records_is_determinated): (usize, bool) = match num_records {
+        Some(num_records) => (num_records, true),
+        None => (0, false),
+    };
+
+    // Append it the dimensions
+    for (dim_name, dim_size) in dims_list.into_iter() {
+        if dim_size == 0 {
+            data_set.set_unlimited_dim(dim_name, num_records)?;
+        } else {
+            data_set.add_fixed_dim(dim_name, dim_size)?;
+        }
+    }
+
+    // Append ot the global attributes
+    for (attr_name, attr_data) in global_attrs_list.into_iter() {
+        use DataVector::*;
+        match attr_data {
+            I8(data) => {
+                data_set.add_global_attr_i8(&attr_name, data)?;
+            }
+            U8(data) => {
+                data_set.add_global_attr_u8(&attr_name, data)?;
+            }
+            I16(data) => {
+                data_set.add_global_attr_i16(&attr_name, data)?;
+            }
+            I32(data) => {
+                data_set.add_global_attr_i32(&attr_name, data)?;
+            }
+            F32(data) => {
+                data_set.add_global_attr_f32(&attr_name, data)?
+            }
+            F64(data) => {
+                data_set.add_global_attr_f64(&attr_name, data)?;
+            }
+        }
+    }
+
+    // Append the variables
+    let mut record_var_begin_offsets: Vec<Offset> = vec![];  // used to computed the number of records if necessaray
+    for var_info in var_info_list.iter() {
+        let dim_refs: Vec<Rc<Dimension>> = data_set.get_dims_from_dim_ids(&var_info.dim_ids)?;
+        // Create the variable the variable
+        let var: &Variable = data_set.add_var_using_dim_refs(&var_info.name, dim_refs, var_info.data_type.clone())?;
+        // Keep the `begin_offset` of the variable
+        if var.is_record_var() {
+            record_var_begin_offsets.push(var_info.begin_offset.clone());
+        }
+        // Append variable attributes
+        let var_name: String = var_info.name.clone();
+        for (attr_name, attr_data) in var_info.attrs_list.iter() {
+            use DataVector::*;
+            match attr_data {
+                I8(data) => {
+                    data_set.add_var_attr_i8(&var_name, &attr_name, data.clone())?;
+                }
+                U8(data) => {
+                    data_set.add_var_attr_u8(&var_name, &attr_name, data.clone())?;
+                }
+                I16(data) => {
+                    data_set.add_var_attr_i16(&var_name, &attr_name, data.clone())?;
+                }
+                I32(data) => {
+                    data_set.add_var_attr_i32(&var_name, &attr_name, data.clone())?;
+                }
+                F32(data) => {
+                    data_set.add_var_attr_f32(&var_name, &attr_name, data.clone())?;
+                }
+                F64(data) => {
+                    data_set.add_var_attr_f64(&var_name, &attr_name, data.clone())?;
+                }
+            }
+        }
+    }
+
+    if !num_records_is_determinated {
+        // Case an *unlimited-size* dim s defined
+        if let Some(dim) = data_set.get_unlimited_dim() {
+            let num_records: usize;
+            // Case: the unlimited dim  is defined but no record variable is defined
+            if record_var_begin_offsets.is_empty() {
+                num_records = 0;
+            }
+            else {
+                // Computation of the number of records
+                let first_begin_offset: usize = record_var_begin_offsets.into_iter().map(|begin_offset: Offset| i64::from(begin_offset) as usize).min().unwrap();
+                let all_records_size: usize = total_file_size - first_begin_offset; // the size allocated for all record data
+                let record_size: usize = data_set.record_size().ok_or(ReadError::Unexpected)?;
+                if record_size == 0 {  // cannot be zero
+                    return Err(ReadError::Unexpected);
+                }
+                num_records = all_records_size.checked_div_euclid(record_size).ok_or(ReadError::Unexpected)?;
+                let num_rem_bytes: usize = all_records_size.checked_rem_euclid(record_size).ok_or(ReadError::Unexpected)?;  // the number of remaining bytes
+                if num_rem_bytes != 0 {
+                    return Err(ReadError::ComputationNumberOfRecords);
+                }
+            }
+            match &dim.size {
+                DimensionSize::Unlimited(dim_size) => {
+                    dim_size.replace(num_records);
+                },
+                _ => {},
+            }
+        }
+    }
+    Ok((data_set, version, var_info_list))
+}
+
+fn parse_magic_word(input: &[u8]) -> Result<(&[u8], &[u8]), ParseHeaderError>
+{
+    let (input, tag_value): (&[u8], &[u8]) = tag(&b"CDF"[..])(input).map_err(|err: NomError|{
+        ParseHeaderError::new(err, ParseHeaderErrorKind::MagicWord)
+    })?;
+    Ok((input, tag_value))
+}
+
+fn parse_version(input: &[u8]) -> Result<(&[u8], Version), ParseHeaderError>
+{
+    let (input, version_number): (&[u8], u8) = verify(be_u8, |ver_num: &u8|{
+        ver_num == &(Version::Classic as u8) || ver_num == &(Version::Offset64Bit as u8)
+    })(input).map_err(|err: NomError|{
+        ParseHeaderError::new(err, ParseHeaderErrorKind::VersionNumber)
+    })?;
+    let version = Version::try_from(version_number).unwrap();  // previously checked
+    Ok((input, version))
+}
+
+/// Parses a `i32` word and checks that it is non-negative.
+fn parse_non_neg_i32(input: &[u8]) -> Result<(&[u8], i32), ParseHeaderError> {
+    verify(be_i32, |number: &i32| *number >= 0_i32)(input).map_err(|err: NomError|{
+        ParseHeaderError::new(err, ParseHeaderErrorKind::NonNegativeI32)
+    })
+}
+
+/// Parses a non-negative `i32` word and converts it to a `usize`.
+fn parse_as_usize(input: &[u8]) -> Result<(&[u8], usize), ParseHeaderError> {
+    let (input, number): (&[u8], i32) = parse_non_neg_i32(input)?;
+    Ok((input, number as usize))
+}
+
+/// Parses the number of records
+///
+/// Returns :
+/// - The numbers of records if it is a valid integer.
+/// - `None` if the number of records is indeterminated
+fn parse_as_usize_optional(input: &[u8]) -> Result<(&[u8], Option<usize>), ParseHeaderError> {
+    const INDETERMINATE_VALUE: u32 = std::u32::MAX;
+    let (input, value): (&[u8], u32) = verify(be_u32, |number: &u32| *number <= (std::i32::MAX as u32) || *number == INDETERMINATE_VALUE)(input).map_err(|err: NomError|{
+        ParseHeaderError::new(err, ParseHeaderErrorKind::NonNegativeI32)
+    })?;
+    let value: Option<usize> = match value {
+        INDETERMINATE_VALUE => None,
+        _ => Some(value as usize),
+    };
+    Ok((input, value))
+}
+
+/// Parses a non-negative `i32` word and converts it to a `u32`.
+fn parse_as_u32(input: &[u8]) -> Result<(&[u8], u32), ParseHeaderError> {
+    let (input, number): (&[u8], i32) = parse_non_neg_i32(input)?;
+    Ok((input, number as u32))
+}
+/// Parses a string
+fn parse_name_string(input: &[u8]) -> Result<(&[u8], String), ParseHeaderError>
+{
+    let (input, num_of_bytes): (&[u8], usize) = parse_as_usize(input)?;
+    let (input, name): (&[u8], String) = map_res(take(num_of_bytes), |bytes: &[u8]| {
+        String::from_utf8(bytes.to_vec())
+    })(input).map_err(|err: NomError|{
+        ParseHeaderError::new(err, ParseHeaderErrorKind::Utf8)
+    })?;
+    // Take the zero padding bytes if necessary
+    let (input, _zero_padding_bytes): (&[u8], &[u8]) = parse_zero_padding(input, compute_padding_size(num_of_bytes))?;
+    Ok((input, name))
+}
+
+// Parses a NetCDF-3 data type.
+fn parse_data_type(input: &[u8]) -> Result<(&[u8], DataType), ParseHeaderError>
+{
+    let start: &[u8] = input;
+    let (input, data_type_number): (&[u8], u32) = parse_as_u32(input)?;
+    let data_type: DataType = DataType::try_from(data_type_number).map_err(|_err|{
+        nom::Err::Error((&start[0..4], nom::error::ErrorKind::Verify))
+    }).map_err(|err: NomError|{
+        ParseHeaderError::new(err, ParseHeaderErrorKind::DataType)
+    })?;
+    Ok((input, data_type))
+}
+
+fn parse_typed_data_elements(input: &[u8], num_of_elements: usize, data_type: DataType) -> Result<(&[u8], DataVector), ParseHeaderError>
+{
+    // Parsed the useful data
+    let (input, data_vector): (&[u8], DataVector) = match data_type {
+        DataType::I8 => many_m_n(num_of_elements, num_of_elements, be_i8)(input).map(|(input, data): (&[u8], Vec<i8>)| (input, DataVector::I8(data))),
+        DataType::U8 => many_m_n(num_of_elements, num_of_elements, be_u8)(input).map(|(input, data): (&[u8], Vec<u8>)| (input, DataVector::U8(data))),
+        DataType::I16 => many_m_n(num_of_elements, num_of_elements, be_i16)(input).map(|(input, data): (&[u8], Vec<i16>)| (input, DataVector::I16(data))),
+        DataType::I32 => many_m_n(num_of_elements, num_of_elements, be_i32)(input).map(|(input, data): (&[u8], Vec<i32>)| (input, DataVector::I32(data))),
+        DataType::F32 => many_m_n(num_of_elements, num_of_elements, be_f32)(input).map(|(input, data): (&[u8], Vec<f32>)| (input, DataVector::F32(data))),
+        DataType::F64 => many_m_n(num_of_elements, num_of_elements, be_f64)(input).map(|(input, data): (&[u8], Vec<f64>)| (input, DataVector::F64(data))),
+    }.map_err(|err: NomError|{
+        ParseHeaderError::new(err, ParseHeaderErrorKind::DataElements)
+    })?;
+
+    // Parse the zero padding bytes if necessary
+    let num_of_bytes: usize = data_type.size_of() * num_of_elements;
+    let (input, _zero_padding_bytes): (&[u8], &[u8]) = parse_zero_padding(input, compute_padding_size(num_of_bytes))?;
+    Ok((input, data_vector))
+}
+
+fn parse_zero_padding(input: &[u8], num_bytes: usize) -> Result<(&[u8], &[u8]), ParseHeaderError>
+{
+    verify(take(num_bytes), |padding_bytes: &[u8]| {
+        padding_bytes.iter().all(|byte: &u8| {
+            *byte == 0_u8
+        })
+    })(input).map_err(|err: NomError|{
+        ParseHeaderError::new(err, ParseHeaderErrorKind::ZeroPadding)
+    })
+}
+
+// Parses the list of the dimensions from the header.
+fn parse_dims_list(input: &[u8]) -> Result<(&[u8], Vec<(String, usize)>), ParseHeaderError>
+{
+    fn parse_dim(input: &[u8]) -> Result<(&[u8], (String, usize)), ParseHeaderError>
+    {
+        let (input, dim_name): (&[u8], String) = parse_name_string(input)?;
+        let (input, dim_size): (&[u8], usize) = parse_as_usize(input)?;
+        Ok((input, (dim_name, dim_size)))
+    }
+    let (input, dim_tag): (&[u8], &[u8]) = alt((tag(ABSENT_TAG), tag(DIMENSION_TAG)))(input).map_err(|err: NomError|{
+        ParseHeaderError::new(err, ParseHeaderErrorKind::DimTag)
+    })?;
+    if dim_tag == &ABSENT_TAG {
+        return Ok((input, vec![]));
+    }
+    let (mut input, num_of_dims): (&[u8], usize) = parse_as_usize(input)?;
+    let mut dims_list: Vec<(String, usize)> = Vec::with_capacity(num_of_dims);
+    for _ in 0..num_of_dims{
+        let (rem_input, dim): (&[u8], (String, usize)) = parse_dim(input)?;
+        input = rem_input;
+        dims_list.push(dim);
+    }
+
+    Ok((input, dims_list))
+}
+
+// Parses a list of attributes (global of from any variables) from the header.
+fn parse_attrs_list(input: &[u8]) -> Result<(&[u8], Vec<(String, DataVector)>), ParseHeaderError>
+{
+    fn parse_attr(input: &[u8]) -> Result<(&[u8], (String, DataVector)), ParseHeaderError>
+    {
+        let (input, attr_name): (&[u8], String) = parse_name_string(input)?;
+        let (input, attr_data_type): (&[u8], DataType) = parse_data_type(input)?;
+        let (input, num_of_elements): (&[u8], usize) = parse_as_usize(input)?;
+        let (input, attr_data): (&[u8], DataVector) = parse_typed_data_elements(input, num_of_elements, attr_data_type)?;
+        Ok((input, (attr_name, attr_data)))
+    }
+    let (input, attr_tag): (&[u8], &[u8]) = alt((tag(ABSENT_TAG), tag(ATTRIBUTE_TAG)))(input).map_err(|err: NomError|{
+        ParseHeaderError::new(err, ParseHeaderErrorKind::AttrTag)
+    })?;
+    if attr_tag == &ABSENT_TAG {
+        return Ok((input, vec![]));
+    }
+    let (mut input, num_of_attrs): (&[u8], usize) = parse_as_usize(input)?;
+    let mut attrs_list: Vec<(String, DataVector)> = Vec::with_capacity(num_of_attrs);
+    for _ in 0..num_of_attrs
+    {
+        let (rem_input, attr): (&[u8], (String, DataVector)) = parse_attr(input)?;
+        input = rem_input;
+        attrs_list.push(attr);
+    }
+    Ok((input, attrs_list))
+}
+
+// Parses a list of variables from the header.
+fn parse_vars_list(input: &[u8], version: Version) -> Result<(&[u8], Vec<VariableParsedMetadata>), ParseHeaderError>
+{
+    fn parse_dim_ids_list(input: &[u8]) -> Result<(&[u8], Vec<usize>), ParseHeaderError>
+    {
+            // number of dimensions
+            let (mut input, num_of_dims): (&[u8], usize) = parse_as_usize(input)?;
+            // list of the dimension ids
+            let mut dim_ids_list: Vec<usize> = Vec::with_capacity(num_of_dims);
+            for _ in 0..num_of_dims {
+                let(rem_input, dim_id): (&[u8], usize) = parse_as_usize(input)?;
+                input = rem_input;
+                dim_ids_list.push(dim_id);
+            }
+            Ok((input, dim_ids_list))
+    }
+
+    fn parse_offset(input: &[u8], version: Version) -> Result<(&[u8], Offset), ParseHeaderError>
+    {
+        match version {
+            Version::Classic => {
+                be_i32(input).map(|(input, num_of_bytes): (&[u8], i32)| {
+                    (input, Offset::I32(num_of_bytes))
+                })
+            },
+            Version::Offset64Bit => {
+                be_i64(input).map(|(input, num_of_bytes): (&[u8], i64)| {
+                    (input, Offset::I64(num_of_bytes))
+                })
+            },
+        }.map_err(|err: NomError| {
+            ParseHeaderError::new(err, ParseHeaderErrorKind::Offset)
+        })
+    }
+
+    fn parse_var(input: &[u8], version: Version) -> Result<(&[u8], VariableParsedMetadata), ParseHeaderError> {
+        // Variable name
+        let (input, var_name): (&[u8], String) = parse_name_string(input)?;
+
+        // list of the dimensions
+        let (input, dim_ids): (&[u8], Vec<usize>) = parse_dim_ids_list(input)?;
+        // list of the variable attributes
+        let (input, attrs_list): (&[u8], Vec<(String, DataVector)>) = parse_attrs_list(input)?;
+        // data type of the variable
+        let (input, data_type): (& [u8], DataType) = parse_data_type(input)?;
+        // size occupied in each record by the variable (number of bytes)
+        let (input, chunk_size): (&[u8], Option<usize>) = parse_as_usize_optional(input)?;
+        // begin offset (number of bytes)
+        let (input, begin_offset): (&[u8], Offset) = parse_offset(input, version)?;
+        let var_def = VariableParsedMetadata {
+            name: var_name,
+            dim_ids: dim_ids,
+            attrs_list: attrs_list,
+            data_type: data_type,
+            _chunk_size: chunk_size,
+            begin_offset: begin_offset,
+        };
+        return Ok((input, var_def));
+    }
+    let (input, var_tag): (&[u8], &[u8]) = alt((tag(ABSENT_TAG), tag(VARIABLE_TAG)))(input).map_err(|err: NomError| {
+        ParseHeaderError::new(err, ParseHeaderErrorKind::VarTag)
+    })?;
+    if var_tag == &ABSENT_TAG {
+        return Ok((input, vec![]));
+    }
+    let (mut input, num_of_vars): (&[u8], usize) = parse_as_usize(input)?;
+    let mut vars_list: Vec<VariableParsedMetadata> = vec![];
+    for _ in 0..num_of_vars {
+        let (temp_input, var) = parse_var(input, version.clone())?;
+        input = temp_input;
+        vars_list.push(var);
+    }
+    Ok((input, vars_list))
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -8,6 +8,7 @@ use crate::{
     error::parse_header_error::{ParseHeaderError, ParseHeaderErrorKind, InvalidBytes},
     io::compute_padding_size,
 };
+use crate::io::file_reader::*;
 
 use copy_to_tmp_file::{
     copy_bytes_to_tmp_file,
@@ -332,7 +333,7 @@ fn test_parse_header() {
 
     let num_of_bytes: usize = NC3_CLASSIC_FILE_BYTES.len();
     let parsing_result: Result<(DataSet, Version, Vec<VariableParsedMetadata>), ReadError>;
-    parsing_result = FileReader::parse_header(NC3_CLASSIC_FILE_BYTES, num_of_bytes);
+    parsing_result = parse_header(NC3_CLASSIC_FILE_BYTES, num_of_bytes);
     assert_eq!(true,                        parsing_result.is_ok());
     let (data_set, version, _vars_info) = parsing_result.unwrap();
 
@@ -570,7 +571,7 @@ fn test_parse_truncated_header()
         let truncated_file_bytes: &[u8] = &b""[..];
         let file_size: usize = truncated_file_bytes.len();
         // Open the NetCDF-3 file
-        let parsing_res: Result<(DataSet, Version, Vec<_>), ReadError> = FileReader::parse_header(truncated_file_bytes, file_size);
+        let parsing_res: Result<(DataSet, Version, Vec<_>), ReadError> = parse_header(truncated_file_bytes, file_size);
         assert_eq!(true,                parsing_res.is_err());
         let parsing_err: ReadError = parsing_res.unwrap_err();
         assert_eq!(true,                parsing_err.header_is_incomplete());
@@ -581,7 +582,7 @@ fn test_parse_truncated_header()
         let truncated_file_bytes: &[u8] = &NC3_CLASSIC_FILE_BYTES[..1];
         let file_size: usize = truncated_file_bytes.len();
         // Open the NetCDF-3 file
-        let parsing_res: Result<(DataSet, Version, Vec<_>), ReadError> = FileReader::parse_header(truncated_file_bytes, file_size);
+        let parsing_res: Result<(DataSet, Version, Vec<_>), ReadError> = parse_header(truncated_file_bytes, file_size);
         assert_eq!(true,                parsing_res.is_err());
         let parsing_err: ReadError = parsing_res.unwrap_err();
         assert_eq!(true,                parsing_err.header_is_incomplete());
@@ -592,7 +593,7 @@ fn test_parse_truncated_header()
         let truncated_file_bytes: &[u8] = &NC3_CLASSIC_FILE_BYTES[..(HEADER_NUM_OF_BYTES - 1)];
         let file_size: usize = truncated_file_bytes.len();
         // Open the NetCDF-3 file
-        let parsing_res: Result<(DataSet, Version, Vec<_>), ReadError> = FileReader::parse_header(truncated_file_bytes, file_size);
+        let parsing_res: Result<(DataSet, Version, Vec<_>), ReadError> = parse_header(truncated_file_bytes, file_size);
         assert_eq!(true,                parsing_res.is_err());
         let parsing_err: ReadError = parsing_res.unwrap_err();
         assert_eq!(true,                parsing_err.header_is_incomplete());
@@ -603,7 +604,7 @@ fn test_parse_truncated_header()
         let truncated_file_bytes: &[u8] = &NC3_CLASSIC_FILE_BYTES[..(HEADER_NUM_OF_BYTES)];
         let file_size: usize = truncated_file_bytes.len();
         // Open the NetCDF-3 file
-        let parsing_res: Result<(DataSet, Version, Vec<_>), ReadError> = FileReader::parse_header(truncated_file_bytes, file_size);
+        let parsing_res: Result<(DataSet, Version, Vec<_>), ReadError> = parse_header(truncated_file_bytes, file_size);
         assert_eq!(true,                parsing_res.is_ok());
     }
 }
@@ -615,7 +616,7 @@ fn test_parse_non_neg_i32() {
         let a: i32 = 0_i32;
         let bytes: [u8; 4] = a.to_be_bytes();
         // parse the integer
-        let (rem_bytes, b): (&[u8], i32) = FileReader::parse_non_neg_i32(&bytes[..]).unwrap();
+        let (rem_bytes, b): (&[u8], i32) = parse_non_neg_i32(&bytes[..]).unwrap();
         // test remaining bytes and the parsed value
         assert_eq!(&[] as &[u8], rem_bytes);
         assert_eq!(0_i32, b);
@@ -626,7 +627,7 @@ fn test_parse_non_neg_i32() {
         let a: i32 = 1_i32;
         let bytes: [u8; 4] = a.to_be_bytes();
         // parse the integer
-        let (rem_bytes, b): (&[u8], i32) = FileReader::parse_non_neg_i32(&bytes[..]).unwrap();
+        let (rem_bytes, b): (&[u8], i32) = parse_non_neg_i32(&bytes[..]).unwrap();
         // test remaining bytes and the parsed value
         assert_eq!(&[] as &[u8], rem_bytes);
         assert_eq!(1_i32, b);
@@ -637,7 +638,7 @@ fn test_parse_non_neg_i32() {
         let a: i32 = std::i32::MAX;
         let bytes: [u8; 4] = a.to_be_bytes();
         // parse the integer
-        let (rem_bytes, b): (&[u8], i32) = FileReader::parse_non_neg_i32(&bytes[..]).unwrap();
+        let (rem_bytes, b): (&[u8], i32) = parse_non_neg_i32(&bytes[..]).unwrap();
         // test remaining bytes and the parsed value
         assert_eq!(&[] as &[u8], rem_bytes);
         assert_eq!(std::i32::MAX, b);
@@ -648,7 +649,7 @@ fn test_parse_non_neg_i32() {
         let a: i32 = -1_i32;
         let bytes: [u8; 4] = a.to_be_bytes();
         // parse the integer
-        let parsing_result = FileReader::parse_non_neg_i32(&bytes[..]);
+        let parsing_result = parse_non_neg_i32(&bytes[..]);
         // check the returned error
         assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
@@ -665,7 +666,7 @@ fn test_parse_non_neg_i32() {
         let a: i32 = std::i32::MIN;
         let bytes: [u8; 4] = a.to_be_bytes();
         // parse the integer
-        let parsing_result = FileReader::parse_non_neg_i32(&bytes[..]);
+        let parsing_result = parse_non_neg_i32(&bytes[..]);
         // check the returned error
         assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
@@ -687,7 +688,7 @@ fn test_parse_non_neg_i32() {
         bytes.push(43);
         bytes.push(44);
         // parse the integer
-        let (rem_bytes, b): (&[u8], i32) = FileReader::parse_non_neg_i32(&bytes[..]).unwrap();
+        let (rem_bytes, b): (&[u8], i32) = parse_non_neg_i32(&bytes[..]).unwrap();
         // test remaining bytes and the parsed value
         assert_eq!(&[42, 43, 44], rem_bytes);
         assert_eq!(1_i32, b);
@@ -699,7 +700,7 @@ fn test_parse_non_neg_i32() {
         let bytes: Vec<u8> = Vec::from(&a.to_be_bytes()[..2]);
         assert_eq!(2, bytes.len());
         // check the returned error
-        let parsing_result = FileReader::parse_non_neg_i32(&bytes[..]);
+        let parsing_result = parse_non_neg_i32(&bytes[..]);
         assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
         assert!(parsing_err.header_is_incomplete());
@@ -718,7 +719,7 @@ fn test_parse_num_records() {
         let a: u32 = std::u32::MAX;
         let bytes: [u8; 4] = a.to_be_bytes();
         // parse the integer
-        let (rem_bytes, b): (&[u8], Option<usize>) = FileReader::parse_as_usize_optional(&bytes[..]).unwrap();
+        let (rem_bytes, b): (&[u8], Option<usize>) = parse_as_usize_optional(&bytes[..]).unwrap();
         // test remaining bytes and the parsed value
         assert_eq!(&[] as &[u8],                    rem_bytes);
         assert_eq!(None,                            b);
@@ -729,7 +730,7 @@ fn test_parse_num_records() {
         let a: u32 = 0_u32;
         let bytes: [u8; 4] = a.to_be_bytes();
         // parse the integer
-        let (rem_bytes, b): (&[u8],Option<usize>) = FileReader::parse_as_usize_optional(&bytes[..]).unwrap();
+        let (rem_bytes, b): (&[u8],Option<usize>) = parse_as_usize_optional(&bytes[..]).unwrap();
         // test remaining bytes and the parsed value
         assert_eq!(&[] as &[u8],                rem_bytes);
         assert_eq!(Some(0),                     b);
@@ -740,7 +741,7 @@ fn test_parse_num_records() {
         let a: u32 = 1_u32;
         let bytes: [u8; 4] = a.to_be_bytes();
         // parse the integer
-        let (rem_bytes, b): (&[u8],Option<usize>) = FileReader::parse_as_usize_optional(&bytes[..]).unwrap();
+        let (rem_bytes, b): (&[u8],Option<usize>) = parse_as_usize_optional(&bytes[..]).unwrap();
         // test remaining bytes and the parsed value
         assert_eq!(&[] as &[u8],                rem_bytes);
         assert_eq!(Some(1),                     b);
@@ -751,7 +752,7 @@ fn test_parse_num_records() {
         let a: u32 = std::i32::MAX as u32;
         let bytes: [u8; 4] = a.to_be_bytes();
         // parse the integer
-        let (rem_bytes, b): (&[u8], Option<usize>) = FileReader::parse_as_usize_optional(&bytes[..]).unwrap();
+        let (rem_bytes, b): (&[u8], Option<usize>) = parse_as_usize_optional(&bytes[..]).unwrap();
         // test remaining bytes and the parsed value
         assert_eq!(&[] as &[u8],                    rem_bytes);
         assert_eq!(Some(std::i32::MAX as usize),    b);
@@ -762,7 +763,7 @@ fn test_parse_num_records() {
         let a: i32 = std::i32::MIN;
         let bytes: [u8; 4] = a.to_be_bytes();
         // parse the integer
-        let parsing_result = FileReader::parse_as_usize_optional(&bytes[..]);
+        let parsing_result = parse_as_usize_optional(&bytes[..]);
         // check the returned error
         assert_eq!(true,                                        parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
@@ -779,7 +780,7 @@ fn test_parse_num_records() {
         let a: u32 = (std::i32::MIN as u32) + 1;
         let bytes: [u8; 4] = a.to_be_bytes();
         // parse the integer
-        let parsing_result = FileReader::parse_as_usize_optional(&bytes[..]);
+        let parsing_result = parse_as_usize_optional(&bytes[..]);
         // check the returned error
         assert_eq!(true,                                        parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
@@ -794,7 +795,7 @@ fn test_parse_num_records() {
         let bytes: Vec<u8> = Vec::from(&a.to_be_bytes()[0..3]);
         // parse the integer
         // parse the integer
-        let parsing_result = FileReader::parse_as_usize_optional(&bytes[..]);
+        let parsing_result = parse_as_usize_optional(&bytes[..]);
         // check the returned error
         assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
@@ -827,7 +828,7 @@ fn test_parse_name_string() {
                 bytes
             };
             // Parse the bytes into a string
-            let (rem_bytes, name): (&[u8], String)= FileReader::parse_name_string(&bytes).unwrap();
+            let (rem_bytes, name): (&[u8], String)= parse_name_string(&bytes).unwrap();
             // Test the parsed string
             assert_eq!("foo", name);
             // And test the remaining bytes
@@ -856,7 +857,7 @@ fn test_parse_name_string() {
                 bytes
             };
             // Parse the bytes into a string
-            let (rem_bytes, name): (&[u8], String)= FileReader::parse_name_string(&bytes).unwrap();
+            let (rem_bytes, name): (&[u8], String)= parse_name_string(&bytes).unwrap();
             // Test the parsed string
             assert_eq!("foo", name);
             // And test the remaining bytes
@@ -889,7 +890,7 @@ fn test_parse_name_string() {
                 bytes
             };
             // check the returned error
-            let parsing_result = FileReader::parse_name_string(&bytes[..]);
+            let parsing_result = parse_name_string(&bytes[..]);
             assert!(parsing_result.is_err());
             let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
             assert_eq!(false,                               parsing_err.header_is_incomplete());
@@ -917,7 +918,7 @@ fn test_parse_name_string() {
                 bytes
             };
             // Parse the bytes into a string
-            let (rem_bytes, name): (&[u8], String)= FileReader::parse_name_string(&bytes).unwrap();
+            let (rem_bytes, name): (&[u8], String)= parse_name_string(&bytes).unwrap();
             // Test the parsed string
             assert_eq!("café", name);
             // And test the remaining bytes
@@ -945,7 +946,7 @@ fn test_parse_name_string() {
                 bytes
             };
             // Parse the bytes into a string
-            let parsing_result: Result<_, _> = FileReader::parse_name_string(&bytes);
+            let parsing_result: Result<_, _> = parse_name_string(&bytes);
             // Test the parsed string
             assert!(parsing_result.is_err());
             assert!(parsing_result.is_err());
@@ -981,7 +982,7 @@ fn test_parse_name_string() {
                 bytes
             };
             // Parse the bytes into a string
-            let parsing_result: Result<_, _> = FileReader::parse_name_string(&bytes);
+            let parsing_result: Result<_, _> = parse_name_string(&bytes);
             // Test the parsed string
             assert!(parsing_result.is_err());
             let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
@@ -1003,7 +1004,7 @@ fn test_parse_data_type() {
     {
         let a: u32 = DataType::I8 as u32;
         let bytes: [u8; 4] = a.to_be_bytes();
-        let (rem_input, data_type): (&[u8], DataType) = FileReader::parse_data_type(&bytes[..]).unwrap();
+        let (rem_input, data_type): (&[u8], DataType) = parse_data_type(&bytes[..]).unwrap();
         assert_eq!(DataType::I8, data_type);
         assert_eq!(&[] as &[u8], rem_input);
     }
@@ -1012,7 +1013,7 @@ fn test_parse_data_type() {
     {
         let a: u32 = DataType::U8 as u32;
         let bytes: [u8; 4] = a.to_be_bytes();
-        let (rem_input, data_type): (&[u8], DataType) = FileReader::parse_data_type(&bytes[..]).unwrap();
+        let (rem_input, data_type): (&[u8], DataType) = parse_data_type(&bytes[..]).unwrap();
         assert_eq!(DataType::U8, data_type);
         assert_eq!(&[] as &[u8], rem_input);
     }
@@ -1021,7 +1022,7 @@ fn test_parse_data_type() {
     {
         let a: u32 = DataType::I16 as u32;
         let bytes: [u8; 4] = a.to_be_bytes();
-        let (rem_input, data_type): (&[u8], DataType) = FileReader::parse_data_type(&bytes[..]).unwrap();
+        let (rem_input, data_type): (&[u8], DataType) = parse_data_type(&bytes[..]).unwrap();
         assert_eq!(DataType::I16, data_type);
         assert_eq!(&[] as &[u8], rem_input);
     }
@@ -1030,7 +1031,7 @@ fn test_parse_data_type() {
     {
         let a: u32 = DataType::I32 as u32;
         let bytes: [u8; 4] = a.to_be_bytes();
-        let (rem_input, data_type): (&[u8], DataType) = FileReader::parse_data_type(&bytes[..]).unwrap();
+        let (rem_input, data_type): (&[u8], DataType) = parse_data_type(&bytes[..]).unwrap();
         assert_eq!(DataType::I32, data_type);
         assert_eq!(&[] as &[u8], rem_input);
     }
@@ -1039,7 +1040,7 @@ fn test_parse_data_type() {
     {
         let a: u32 = DataType::F32 as u32;
         let bytes: [u8; 4] = a.to_be_bytes();
-        let (rem_input, data_type): (&[u8], DataType) = FileReader::parse_data_type(&bytes[..]).unwrap();
+        let (rem_input, data_type): (&[u8], DataType) = parse_data_type(&bytes[..]).unwrap();
         assert_eq!(DataType::F32, data_type);
         assert_eq!(&[] as &[u8], rem_input);
     }
@@ -1048,7 +1049,7 @@ fn test_parse_data_type() {
     {
         let a: u32 = DataType::F64 as u32;
         let bytes: [u8; 4] = a.to_be_bytes();
-        let (rem_input, data_type): (&[u8], DataType) = FileReader::parse_data_type(&bytes[..]).unwrap();
+        let (rem_input, data_type): (&[u8], DataType) = parse_data_type(&bytes[..]).unwrap();
         assert_eq!(DataType::F64, data_type);
         assert_eq!(&[] as &[u8], rem_input);
     }
@@ -1059,7 +1060,7 @@ fn test_parse_data_type() {
         assert!(DataType::try_from(a).is_err());
 
         let bytes: [u8; 4] = a.to_be_bytes();
-        let parsing_result = FileReader::parse_data_type(&bytes[..]);
+        let parsing_result = parse_data_type(&bytes[..]);
         assert!(parsing_result.is_err());
     }
 
@@ -1068,7 +1069,7 @@ fn test_parse_data_type() {
         let a: i32 = -1_i32;
 
         let bytes: [u8; 4] = a.to_be_bytes();
-        let parsing_result = FileReader::parse_data_type(&bytes[..]);
+        let parsing_result = parse_data_type(&bytes[..]);
         // Check the return error
         assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
@@ -1089,7 +1090,7 @@ fn test_parse_data_type() {
         bytes.push(43);
         bytes.push(44);
 
-        let (rem_input, data_type): (&[u8], DataType) = FileReader::parse_data_type(&bytes[..]).unwrap();
+        let (rem_input, data_type): (&[u8], DataType) = parse_data_type(&bytes[..]).unwrap();
         assert_eq!(DataType::F64, data_type);
         assert_eq!(
             &[42, 43, 44],
@@ -1102,7 +1103,7 @@ fn test_parse_data_type() {
         let a: u32 = DataType::F64 as u32;
         let bytes: Vec<u8> = Vec::from(&a.to_be_bytes()[..3]);
         assert_eq!(3, bytes.len());
-        let parsing_result = FileReader::parse_data_type(&bytes[..]);
+        let parsing_result = parse_data_type(&bytes[..]);
         // Check the return error
         assert!(parsing_result.is_err());
         let parsing_err: ParseHeaderError = parsing_result.unwrap_err();
@@ -1120,7 +1121,7 @@ fn test_parse_zero_padding() {
     // Test valid zero padding
     {
         let bytes: [u8; 3] = [0_u8; 3];
-        let (rem_input, zero_padding): (&[u8], &[u8]) = FileReader::parse_zero_padding(&bytes, 3).unwrap();
+        let (rem_input, zero_padding): (&[u8], &[u8]) = parse_zero_padding(&bytes, 3).unwrap();
         assert_eq!(0, rem_input.len());
         assert_eq!(&[0, 0, 0], zero_padding);
 
@@ -1128,7 +1129,7 @@ fn test_parse_zero_padding() {
     // Test not valid zero padding
     {
         let bytes: [u8; 3] = [0, 1, 0];
-        let parsing_result = FileReader::parse_zero_padding(&bytes, 3);
+        let parsing_result = parse_zero_padding(&bytes, 3);
         // Check the return error
         assert!(parsing_result.is_err());
         let parsing_err = parsing_result.unwrap_err();
@@ -1145,7 +1146,7 @@ fn test_parse_zero_padding() {
     // Test missing bytes
     {
         let bytes: [u8; 3] = [0_u8; 3];
-        let parsing_result = FileReader::parse_zero_padding(&bytes[0..2], 3);
+        let parsing_result = parse_zero_padding(&bytes[0..2], 3);
         // Check the return error
         assert!(parsing_result.is_err());
         let parsing_err = parsing_result.unwrap_err();
@@ -1172,7 +1173,7 @@ fn test_read_indeterminated_num_records() {
         // 1: Read a data set where in which the `num_records` is defined
         let original_dataset: DataSet = {
             let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(NC3_CLASSIC_FILE_BYTES, NC3_CLASSIC_FILE_NAME);
-            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let file_reader = FileReader::open(input_file_path).unwrap();
             let data_set: DataSet = file_reader.close().0;
             tmp_dir.close().unwrap();
             data_set
@@ -1188,7 +1189,7 @@ fn test_read_indeterminated_num_records() {
                 bytes
             };
             let (tmp_dir, input_file_path) =  copy_bytes_to_tmp_file(&modified_bytes[..], NC3_CLASSIC_FILE_NAME);
-            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let file_reader = FileReader::open(input_file_path).unwrap();
             let data_set: DataSet = file_reader.close().0;
             tmp_dir.close().unwrap();
             data_set
@@ -1224,7 +1225,7 @@ fn test_read_indeterminated_num_records() {
         // 1: Read a data set where in which the `num_records` is defined
         let original_dataset: DataSet = {
             let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(SCALAR_VARIABLES_FILE_BYTES, SCALAR_VARIABLES_FILE_NAME);
-            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let file_reader = FileReader::open(input_file_path).unwrap();
             let data_set: DataSet = file_reader.close().0;
             tmp_dir.close().unwrap();
             data_set
@@ -1240,7 +1241,7 @@ fn test_read_indeterminated_num_records() {
                 bytes
             };
             let (tmp_dir, input_file_path) =  copy_bytes_to_tmp_file(&modified_bytes[..], SCALAR_VARIABLES_FILE_NAME);
-            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let file_reader = FileReader::open(input_file_path).unwrap();
             let data_set: DataSet = file_reader.close().0;
             tmp_dir.close().unwrap();
             data_set
@@ -1259,7 +1260,7 @@ fn test_read_indeterminated_num_records() {
         // 1: Read a data set where in which the `num_records` is defined
         let original_dataset: DataSet = {
             let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(EMPTY_DATA_SET_FILE_BYTES, EMPTY_DATA_SET_FILE_NAME);
-            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let file_reader = FileReader::open(input_file_path).unwrap();
             let data_set: DataSet = file_reader.close().0;
             tmp_dir.close().unwrap();
             data_set
@@ -1275,7 +1276,7 @@ fn test_read_indeterminated_num_records() {
                 bytes
             };
             let (tmp_dir, input_file_path) =  copy_bytes_to_tmp_file(&modified_bytes[..], EMPTY_DATA_SET_FILE_NAME);
-            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let file_reader = FileReader::open(input_file_path).unwrap();
             let data_set: DataSet = file_reader.close().0;
             tmp_dir.close().unwrap();
             data_set
@@ -1297,7 +1298,7 @@ fn test_read_indeterminated_num_records() {
         // 1: Read a data set where in which the `num_records` is defined
         let original_dataset: DataSet = {
             let (tmp_dir, input_file_path) = copy_bytes_to_tmp_file(NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_BYTES, NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME);
-            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let file_reader = FileReader::open(input_file_path).unwrap();
             let data_set: DataSet = file_reader.close().0;
             tmp_dir.close().unwrap();
             data_set
@@ -1313,7 +1314,7 @@ fn test_read_indeterminated_num_records() {
                 bytes
             };
             let (tmp_dir, input_file_path) =  copy_bytes_to_tmp_file(&modified_bytes[..], NC3_ZERO_SIZED_UNLIMITED_DIM_FILE_NAME);
-            let file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+            let file_reader = FileReader::open(input_file_path).unwrap();
             let data_set: DataSet = file_reader.close().0;
             tmp_dir.close().unwrap();
             data_set

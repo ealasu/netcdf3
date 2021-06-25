@@ -434,7 +434,7 @@ fn test_write_file_containing_default_fill_values() {
             NC_FILL_F32, NC_FILL_F64,
         };
 
-        let mut file_reader: FileReader = FileReader::open(&output_file_path).unwrap();
+        let mut file_reader = FileReader::open(&output_file_path).unwrap();
         let variables: HashMap<String, DataVector> = file_reader.read_all_vars().unwrap();
 
         // let _: (DataSet, Version) = file_reader.close();

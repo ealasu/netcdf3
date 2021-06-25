@@ -29,7 +29,7 @@ use crate::DataType;
 ///
 /// // Read variable data from the file
 /// // ---------------------------------
-/// let mut file_reader: FileReader = FileReader::open(input_file_path).unwrap();
+/// let mut file_reader = FileReader::open(input_file_path).unwrap();
 /// assert_eq!(NUM_VARS,                        file_reader.data_set().num_vars());
 /// assert_eq!(true,                            file_reader.data_set().has_var(LATITUDE_VAR_NAME));
 /// assert_eq!(DataType::F32,                   file_reader.data_set().var_data_type(LATITUDE_VAR_NAME).unwrap());
